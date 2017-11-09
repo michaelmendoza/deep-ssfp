@@ -1,8 +1,12 @@
 % Converts data files to training data in a .mat
 
-basepath = "./11062017_SSFP_Smoothing_DL_Phantom/";
-filenames = ["meas_MID164_trufi_phi0_FID6709.dat", "meas_MID165_trufi_phi90_FID6710.dat", ...
-            "meas_MID166_trufi_phi180_FID6711.dat", "meas_MID167_trufi_phi270_FID6712.dat"];
+%basepath = "./10282017_SSPF Smoothing DL/";
+%filenames = ["meas_MID885_trufi_phi0_FID4833.dat", "meas_MID894_trufi_phi90_FID4842.dat", ...
+%            "meas_MID903_trufi_phi180_FID4851.dat", "meas_MID912_trufi_phi270_FID4860.dat"];
+
+basepath = "./Merry_SSFP_Scans/ssfpknee/";
+filenames = ["meas_MID40_SSFPdjp_TR5_4_TE2_7_PC0_FA15_FID1540.dat","meas_MID42_SSFPdjp_TR5_4_TE2_7_PC90_FA15_FID1542.dat", ...
+             "meas_MID44_SSFPdjp_TR5_4_TE2_7_PC180_FA15_FID1544.dat", "meas_MID46_SSFPdjp_TR5_4_TE2_7_PC270_FA15_FID1546.dat"];     
 
 for f = 1:length(filenames)
     f
@@ -10,7 +14,7 @@ for f = 1:length(filenames)
     im = loadImg(filepath);
     
     figure(f);
-    imshow(abs(im(:,:,64)),[]);
+    imshow(abs(im(:,:,4)),[]);
     
     if(f == 1)
         s = size(im);
@@ -19,13 +23,6 @@ for f = 1:length(filenames)
     
     imgs(:,:,:,f) = im;
 end
-
-ss = imgs(:,:,:,1) .* imgs(:,:,:,1);
-ss = ss + imgs(:,:,:,2) .* imgs(:,:,:,2);
-ss = ss + imgs(:,:,:,3) .* imgs(:,:,:,3);
-ss = ss + imgs(:,:,:,4) .* imgs(:,:,:,4);
-figure(5);
-imshow(abs(ss(:,:,64)), []);
 
 s = size(imgs);
 em = zeros(s(1), s(2), s(3));
@@ -36,9 +33,9 @@ for ss = 1:s(3)
     em(:,:,ss) = EllipticalModel(im1, im2, im3, im4);    
 end
 figure(6);
-imshow(abs(em(:,:,64)), []);
+imshow(abs(em(:,:,4)), []);
 
-save('trainData.mat', 'imgs', 'em');
+save('trainDataLeg.mat', 'imgs', 'em');
 
 function im = loadImg(filepath)
     img = readMeasDataVB15(filepath);
