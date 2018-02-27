@@ -5,8 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
-import os
-
 
 def load():
 
@@ -61,6 +59,9 @@ class DataSet:
         self.input = self.imgs[indices]
         self.output = self.out[indices]
 
+        # Setup data 
+        self.input = self.whiten_data(self.input)
+        
         # Split data into test/training sets
         index = int(self.ratio * len(self.input)) # Split index
         self.x_train = self.input[0:index, :]
@@ -68,13 +69,13 @@ class DataSet:
         self.x_test = self.input[index:,:]
         self.y_test = self.output[index:]
 
-    def whiten_data(self, features):
+    def whiten_data(self, data): 
         """ whiten dataset - zero mean and unit standard deviation """
-        features = np.reshape(features, (self.size, self.WIDTH * self.HEIGHT * self.CHANNELS_IN))
-        features = (np.swapaxes(features,0,1) - np.mean(features, axis=1)) / np.std(features, axis=1)
-        features = np.swapaxes(features,0,1)
-        features = np.reshape(features, (self.size, self.WIDTH, self.HEIGHT, self.CHANNELS_IN))
-        return features
+        data = np.reshape(data, (self.SIZE, self.WIDTH * self.HEIGHT * self.CHANNELS_IN))
+        data = (np.swapaxes(data,0,1) - np.mean(data, axis=1)) / np.std(data, axis=1)
+        data = np.swapaxes(data,0,1)
+        data = np.reshape(data, (self.SIZE, self.WIDTH, self.HEIGHT, self.CHANNELS_IN))
+        return data
 
     def unwhiten_img(self, img): 
         """ remove whitening for a single image """ 
@@ -83,10 +84,10 @@ class DataSet:
         img = np.reshape(img, (self.WIDTH, self.HEIGHT, self.CHANNELS_IN))
         return img
 
-    def train_batch(self, batch_size):
-        length = self.imgs.shape[0]
+    def next_batch(self, batch_size):
+        length = self.input.shape[0]
         indices = np.random.randint(0, length, batch_size);
-        return [self.imgs[indices], self.out[indices]]
+        return [self.input[indices], self.output[indices]]
 
     def plot(self, x, y):
         fig, axes = plt.subplots(ncols=2)
