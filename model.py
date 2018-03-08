@@ -8,9 +8,8 @@ def simple_net(x):
     he_init = tf.contrib.layers.variance_scaling_initializer()
     conv1 = tf.layers.conv2d(x,     32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='h1')
     conv2 = tf.layers.conv2d(conv1, 32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='h2')
-    logits = tf.layers.conv2d(conv2, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None, kernel_initializer=he_init, name='output')
-    prediction = tf.nn.softmax(logits)
-    return logits, prediction
+    prediction = tf.layers.conv2d(conv2, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None, kernel_initializer=he_init, name='output')
+    return prediction
 
 def simple_unet(x):
 
@@ -25,9 +24,8 @@ def simple_unet(x):
 
     conv5 = tf.layers.conv2d(up1,   32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv5')
     conv6 = tf.layers.conv2d(conv5, 32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv6')
-    logits = tf.layers.conv2d(conv6, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None,       kernel_initializer=he_init, name='Output')
-    prediction = tf.nn.softmax(logits)
-    return logits, prediction
+    prediction = tf.layers.conv2d(conv6, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None,       kernel_initializer=he_init, name='Output')
+    return prediction
 
 def unet(x):
     he_init = tf.contrib.layers.variance_scaling_initializer()
@@ -70,7 +68,5 @@ def unet(x):
     conv9 = tf.layers.conv2d(up9, 32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv9')
     conv9 = tf.layers.conv2d(conv9, 32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv9-2')
     
-    logits = tf.layers.conv2d(conv9, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None, kernel_initializer=he_init, name='Output')
-    prediction = tf.nn.softmax(logits)
-
-    return logits, prediction
+    prediction = tf.layers.conv2d(conv9, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None, kernel_initializer=he_init, name='Output')
+    return prediction

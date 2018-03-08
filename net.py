@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+import model 
+
 # Import Dataset
 from data import DataSet
 data = DataSet()
@@ -36,9 +38,7 @@ X = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, CHANNELS])  # Input
 Y = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, NUM_OUTPUTS]) # Truth Data - Output
 
 # Define loss and optimizer
-import model 
-logits, prediction = model.simple_net(X) #unet(X)
-#loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
+prediction = model.simple_net(X) #unet(X)
 loss = tf.reduce_mean(tf.square(prediction - Y))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 trainer = optimizer.minimize(loss)
