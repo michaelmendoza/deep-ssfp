@@ -7,4 +7,4 @@ Implementation of a deep learning model (using tensorflow) for SSFP band removal
 
 ## Results 
 
-![Reconstruction Results](results/unet-results.png)
+![Reconstruction Results](assets/unet-results.png)
