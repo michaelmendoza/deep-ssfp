@@ -14,8 +14,8 @@ class DataSet:
              self.imgs, self.out = self.load_format_data_subset()
 
         self.SIZE = self.imgs.shape[0]
-        self.WIDTH = self.imgs.shape[1]
-        self.HEIGHT = self.imgs.shape[2]
+        self.HEIGHT = self.imgs.shape[1]
+        self.WIDTH = self.imgs.shape[2]
         self.CHANNELS_IN = self.imgs.shape[3]
         self.CHANNELS_OUT = 2
         self.ratio = 0.8
@@ -32,7 +32,7 @@ class DataSet:
         x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
         imgs = imgs[x:x+wx, y:y+wy, z:z+wz, :]
         out = out[x:x+wx, y:y+wy, z:z+wz]
-        
+
         # Swap axies 
         imgs = np.swapaxes(imgs,0,2);
         imgs = np.swapaxes(imgs,1,2);

@@ -22,7 +22,7 @@ data = DataSet(True)
 data.print()
 
 # Training Parameters
-learning_rate = 1e-4 
+learning_rate = 1e-4
 num_steps = 10000
 batch_size = 16
 display_step = 100
@@ -68,7 +68,7 @@ prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
 data.plot(data.x_test[0], data.y_test[0], prediction[0])
 
 # Plot loss
-plt.plot(_step, np.log(_loss))
+plt.plot(_step, np.log10(_loss))
 plt.title('Mean Squared Error (MSE)')
 plt.xlabel('Epoches')
 plt.ylabel('ln(MSE)')
