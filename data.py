@@ -29,10 +29,10 @@ class DataSet:
         out = np.array(data['em'])
 
         # Crop data
-        x = 192; y = 12; z = 32; w = 128; w2 = 64
-        imgs = imgs[x:x+w, y:y+w, z:z+w2, :]
-        out = out[x:x+w, y:y+w, z:z+w2]
-
+        x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
+        imgs = imgs[x:x+wx, y:y+wy, z:z+wz, :]
+        out = out[x:x+wx, y:y+wy, z:z+wz]
+        
         # Swap axies 
         imgs = np.swapaxes(imgs,0,2);
         imgs = np.swapaxes(imgs,1,2);
@@ -160,4 +160,15 @@ if __name__ == "__main__":
     data = DataSet()
     data.print()
     x, y = data.next_batch(1)
-    data.plot(x[0], y[0])
+
+    print(x.shape, y.shape)
+    x = x[0,:,:,0] + 1j * x[0,:,:,1]
+    y = y[0,:,:,0] + 1j * y[0,:,:,1]
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.abs(x), cmap='gray')
+    plt.axis('off')
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.abs(y), cmap='gray')
+    plt.axis('off')
+
+    plt.show()  

@@ -22,7 +22,7 @@ data = DataSet(True)
 data.print()
 
 # Training Parameters
-learning_rate = 1e-4
+learning_rate = 1e-4 
 num_steps = 10000
 batch_size = 16
 display_step = 100
