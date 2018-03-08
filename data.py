@@ -6,50 +6,72 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
 
-def load():
-
-    # Load data from matlab data
-    data = sio.loadmat('./data/trainData.mat')
-    imgs = np.array(data['imgs'])
-    out = np.array(data['em'])
-
-    # Crop data
-    x = 192
-    y = 12
-    z = 32
-    w = 128
-    w2 = 64
-    imgs = imgs[x:x+w, y:y+w, z:z+w2, :]
-    out = out[x:x+w, y:y+w, z:z+w2]
-
-    # Swap axies 
-    imgs = np.swapaxes(imgs,0,2);
-    imgs = np.swapaxes(imgs,1,2);
-    out = np.swapaxes(out,0,2);
-    out = np.swapaxes(out,1,2);
-
-    # Separate complex data into real/img components
-    s = imgs.shape
-    _imgs = np.zeros((s[0], s[1], s[2], 8))
-    for n in [0,1,2,3]:
-        _imgs[:,:,:,2*n] = imgs[:,:,:,n].real
-        _imgs[:,:,:,2*n+1] = imgs[:,:,:,n].imag
-    _out = np.zeros((s[0], s[1], s[2], 2))
-    _out[:,:,:,0] = out.real
-    _out[:,:,:,1] = out.imag
-    return _imgs, _out
-
 class DataSet:
-    def __init__(self):
-        self.imgs, self.out = load()
+    def __init__(self, useSubset=False):
+        if(not useSubset):
+            self.imgs, self.out = self.load_format_data()
+        else:
+             self.imgs, self.out = self.load_format_data_subset()
+
         self.SIZE = self.imgs.shape[0]
         self.WIDTH = self.imgs.shape[1]
         self.HEIGHT = self.imgs.shape[2]
-        self.CHANNELS_IN = 8
+        self.CHANNELS_IN = self.imgs.shape[3]
         self.CHANNELS_OUT = 2
         self.ratio = 0.8
 
         self.generate();
+
+    def load(self):
+        # Load data from matlab data
+        data = sio.loadmat('./data/trainData.mat')
+        imgs = np.array(data['imgs'])
+        out = np.array(data['em'])
+
+        # Crop data
+        x = 192; y = 12; z = 32; w = 128; w2 = 64
+        imgs = imgs[x:x+w, y:y+w, z:z+w2, :]
+        out = out[x:x+w, y:y+w, z:z+w2]
+
+        # Swap axies 
+        imgs = np.swapaxes(imgs,0,2);
+        imgs = np.swapaxes(imgs,1,2);
+        out = np.swapaxes(out,0,2);
+        out = np.swapaxes(out,1,2);
+        return imgs, out
+
+    def load_format_data(self):
+         # Separate complex data into real/img components
+
+        imgs, out = self.load()
+
+        s = imgs.shape
+        _imgs = np.zeros((s[0], s[1], s[2], 8))
+        for n in [0,1,2,3]:
+            _imgs[:,:,:,2*n] = imgs[:,:,:,n].real
+            _imgs[:,:,:,2*n+1] = imgs[:,:,:,n].imag
+        _out = np.zeros((s[0], s[1], s[2], 2))
+        _out[:,:,:,0] = out.real
+        _out[:,:,:,1] = out.imag
+        return _imgs, _out
+
+
+    def load_format_data_subset(self):
+        # Separate complex data into real/img components for only 2 img sets
+
+        imgs, out = self.load()
+
+        s = imgs.shape
+        _imgs = np.zeros((s[0], s[1], s[2], 4))
+        _imgs[:,:,:,0] = imgs[:,:,:,0].real
+        _imgs[:,:,:,1] = imgs[:,:,:,0].imag
+        _imgs[:,:,:,2] = imgs[:,:,:,2].real
+        _imgs[:,:,:,3] = imgs[:,:,:,2].imag
+
+        _out = np.zeros((s[0], s[1], s[2], 2))
+        _out[:,:,:,0] = out.real
+        _out[:,:,:,1] = out.imag
+        return _imgs, _out
 
     def generate(self):
 
@@ -101,41 +123,30 @@ class DataSet:
         return [self.input[indices], self.output[indices]]
 
     def plot(self, input, output, results):
-        img0 = input[:,:,0] + 1j * input[:,:,1]
-        img1 = input[:,:,2] + 1j * input[:,:,3]
-        img2 = input[:,:,4] + 1j * input[:,:,5]
-        img3 = input[:,:,6] + 1j * input[:,:,7]
+        imgs = []
+        imgs.append(input[:,:,0] + 1j * input[:,:,1])
+        imgs.append(input[:,:,2] + 1j * input[:,:,3])
+        if(input.shape[2] > 4):
+            imgs.append(input[:,:,4] + 1j * input[:,:,5])
+            imgs.append(input[:,:,6] + 1j * input[:,:,7])
 
-        img4 = output[:,:,0] + 1j * output[:,:,1]
-        img5 = results[:,:,0] + 1j * results[:,:,1]
+        imgs.append(output[:,:,0] + 1j * output[:,:,1])
+        imgs.append(results[:,:,0] + 1j * results[:,:,1])
 
-        plt.subplot(1, 6, 1)
-        plt.imshow(np.abs(img0), cmap='gray')
-        plt.title('Image 1')
-        plt.axis('off')
+        count = int(input.shape[2] / 2) # Count of plots  
+        for i in range(count):   
+            plt.subplot(1, count+2, i+1)
+            plt.imshow(np.abs(imgs[i]), cmap='gray')
+            plt.title('Image' + str(i+1))
+            plt.axis('off')
 
-        plt.subplot(1, 6, 2)
-        plt.imshow(np.abs(img1), cmap='gray')
-        plt.title('Image 2')
-        plt.axis('off')
-
-        plt.subplot(1, 6, 3)
-        plt.imshow(np.abs(img2), cmap='gray')
-        plt.title('Image 3')
-        plt.axis('off')
-
-        plt.subplot(1, 6, 4)
-        plt.imshow(np.abs(img3), cmap='gray')
-        plt.title('Image 4')
-        plt.axis('off')
-
-        plt.subplot(1, 6, 5)
-        plt.imshow(np.abs(img4), cmap='gray')
+        plt.subplot(1, count+2, i+2)
+        plt.imshow(np.abs(imgs[i+1]), cmap='gray')
         plt.title('Elliptical Model')
         plt.axis('off')
 
-        plt.subplot(1, 6, 6)
-        plt.imshow(np.abs(img5), cmap='gray')
+        plt.subplot(1, count+2, i+3)
+        plt.imshow(np.abs(imgs[i+2]), cmap='gray')
         plt.title('Results')
         plt.axis('off')
         plt.show()  
