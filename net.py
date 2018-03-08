@@ -19,7 +19,7 @@ data = DataSet()
 data.print()
 
 # Training Parameters
-learning_rate = 0.0001
+learning_rate = 1e-4
 num_steps = 1000
 batch_size = 16
 display_step = 100 
@@ -37,8 +37,9 @@ Y = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, NUM_OUTPUTS]) # Truth Data 
 
 # Define loss and optimizer
 import model 
-logits, prediction = model.unet(X)
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
+logits, prediction = model.simple_net(X) #unet(X)
+#loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
+loss = tf.reduce_mean(tf.square(prediction - Y))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 trainer = optimizer.minimize(loss)
 
@@ -62,6 +63,4 @@ for step in range(num_steps):
 
 # Show results
 prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
-print(prediction.shape)
-index = 0
 data.plot(data.x_test[0], prediction[0])

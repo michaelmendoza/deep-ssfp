@@ -16,10 +16,11 @@ def load():
     # Crop data
     x = 192
     y = 12
-    z = 0
+    z = 32
     w = 128
-    imgs = imgs[x:x+w, y:y+w, z:z+w, :]
-    out = out[x:x+w, y:y+w, z:z+w]
+    w2 = 64
+    imgs = imgs[x:x+w, y:y+w, z:z+w2, :]
+    out = out[x:x+w, y:y+w, z:z+w2]
 
     # Swap axies 
     imgs = np.swapaxes(imgs,0,2);
@@ -37,7 +38,6 @@ def load():
     _out[:,:,:,0] = out.real
     _out[:,:,:,1] = out.imag
     return _imgs, _out
-
 
 class DataSet:
     def __init__(self):
@@ -60,8 +60,9 @@ class DataSet:
         self.output = self.out[indices]
 
         # Setup data 
-        self.input = self.whiten_data(self.input)
-        
+        self.input = self.normalize_data(self.input)
+        self.output = self.normalize_data(self.output)
+
         # Split data into test/training sets
         index = int(self.ratio * len(self.input)) # Split index
         self.x_train = self.input[0:index, :]
@@ -69,12 +70,22 @@ class DataSet:
         self.x_test = self.input[index:,:]
         self.y_test = self.output[index:]
 
+        #TODO: NORMALIZE WITH ENTIRE DATASET? NOT SLICES
+    def normalize_data(self, data): 
+        s = data.shape 
+        data = np.reshape(data, (s[0], s[1] * s[2] * s[3]))
+        data = np.swapaxes(data, 0, 1) / (np.max(data, axis=1) - np.min(data, axis=1)) 
+        data = np.swapaxes(data, 0, 1)
+        data = np.reshape(data, (s[0], s[1], s[2], s[3]))
+        return data
+
     def whiten_data(self, data): 
         """ whiten dataset - zero mean and unit standard deviation """
-        data = np.reshape(data, (self.SIZE, self.WIDTH * self.HEIGHT * self.CHANNELS_IN))
-        data = (np.swapaxes(data,0,1) - np.mean(data, axis=1)) / np.std(data, axis=1)
-        data = np.swapaxes(data,0,1)
-        data = np.reshape(data, (self.SIZE, self.WIDTH, self.HEIGHT, self.CHANNELS_IN))
+        s = data.shape
+        data = np.reshape(data, (s[0], s[1] * s[2] * s[3]))
+        data = (np.swapaxes(data, 0, 1) - np.mean(data, axis=1)) / np.std(data, axis=1)
+        data = np.swapaxes(data, 0, 1)
+        data = np.reshape(data, (s[0], s[1], s[2], s[3]))
         return data
 
     def unwhiten_img(self, img): 
@@ -93,8 +104,10 @@ class DataSet:
         fig, axes = plt.subplots(ncols=2)
         _first = x[:,:,0] + 1j * x[:,:,1]
         _second = y[:,:,0] + 1j * y[:,:,1]
-        axes[0].imshow(np.abs(_first))
-        axes[1].imshow(np.abs(_second))
+        #_first = x[:,:,0]
+        #_second = x[:,:,1]
+        axes[0].imshow(np.abs(_first), cmap='gray')
+        axes[1].imshow(np.abs(_second), cmap='gray')
         plt.show()  
 
     def print(self):
@@ -105,5 +118,5 @@ class DataSet:
 if __name__ == "__main__":
     data = DataSet()
     data.print()
-    x, y = data.train_batch(1)
+    x, y = data.next_batch(1)
     data.plot(x[0], y[0])
