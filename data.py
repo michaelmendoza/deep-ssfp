@@ -100,14 +100,44 @@ class DataSet:
         indices = np.random.randint(0, length, batch_size);
         return [self.input[indices], self.output[indices]]
 
-    def plot(self, x, y):
-        fig, axes = plt.subplots(ncols=2)
-        _first = x[:,:,0] + 1j * x[:,:,1]
-        _second = y[:,:,0] + 1j * y[:,:,1]
-        #_first = x[:,:,0]
-        #_second = x[:,:,1]
-        axes[0].imshow(np.abs(_first), cmap='gray')
-        axes[1].imshow(np.abs(_second), cmap='gray')
+    def plot(self, input, output, results):
+        img0 = input[:,:,0] + 1j * input[:,:,1]
+        img1 = input[:,:,2] + 1j * input[:,:,3]
+        img2 = input[:,:,4] + 1j * input[:,:,5]
+        img3 = input[:,:,6] + 1j * input[:,:,7]
+
+        img4 = output[:,:,0] + 1j * output[:,:,1]
+        img5 = results[:,:,0] + 1j * results[:,:,1]
+
+        plt.subplot(1, 6, 1)
+        plt.imshow(np.abs(img0), cmap='gray')
+        plt.title('Image 1')
+        plt.axis('off')
+
+        plt.subplot(1, 6, 2)
+        plt.imshow(np.abs(img1), cmap='gray')
+        plt.title('Image 2')
+        plt.axis('off')
+
+        plt.subplot(1, 6, 3)
+        plt.imshow(np.abs(img2), cmap='gray')
+        plt.title('Image 3')
+        plt.axis('off')
+
+        plt.subplot(1, 6, 4)
+        plt.imshow(np.abs(img3), cmap='gray')
+        plt.title('Image 4')
+        plt.axis('off')
+
+        plt.subplot(1, 6, 5)
+        plt.imshow(np.abs(img4), cmap='gray')
+        plt.title('Elliptical Model')
+        plt.axis('off')
+
+        plt.subplot(1, 6, 6)
+        plt.imshow(np.abs(img5), cmap='gray')
+        plt.title('Results')
+        plt.axis('off')
         plt.show()  
 
     def print(self):
