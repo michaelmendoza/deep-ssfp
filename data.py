@@ -44,7 +44,7 @@ class DataSet:
         phi270 = np.average(phi270, axis=3)
         print("All images averaged....")
 
-        #create a smaller dataset - 2 axis depth will be two
+        #create a smaller dataset for testing
         # phi0 = phi0[:,:,:1]
         # phi90 = phi90[:,:,:1]
         # phi180 = phi180[:,:,:1]
@@ -64,14 +64,6 @@ class DataSet:
         # print(out.shape)
         # print(" (M): ")
         # print(out2.shape)
-
-        #things to ask Michael
-        #elliptical signal model, image or kSpace data (should be image data for this class and I think the elliptical model)
-        #four different channels are messing up the elliptical model file Michael gave me
-        #concatenating arrays, how exactly does his imgs array work, same size as Nicholas's input for one image
-
-        #imgs = concat
-        #out = np.array(ellip)
 
         # Crop data
         x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
