@@ -1,15 +1,17 @@
 from __future__ import division, print_function
 
-from skimage import io, transform
+#from skimage import io, transform
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
+from loader import load_image_data, load_kSpace_data
+from elliptical_model import elliptical_model
 
 class DataSet:
     def __init__(self, useSubset=False):
         if(not useSubset):
-            self.imgs, self.out = self.load_format_data()
+            self.imgs, self.out  = self.load_format_data()
         else:
              self.imgs, self.out = self.load_format_data_subset()
 
@@ -24,9 +26,52 @@ class DataSet:
 
     def load(self):
         # Load data from matlab data
-        data = sio.loadmat('./data/trainData.mat')
-        imgs = np.array(data['imgs'])
-        out = np.array(data['em'])
+        # data = sio.loadmat('./data/trainData.mat')
+        # imgs2 = np.array(data['imgs'])
+        # out2 = np.array(data['em'])
+
+        # load from Nicholas's rawDatarInator - 3D input data
+        phi0 = load_image_data('../meas_MID164_trufi_phi0_FID6709.dat')
+        phi90 = load_image_data('../meas_MID165_trufi_phi90_FID6710.dat')
+        phi180 = load_image_data('../meas_MID166_trufi_phi180_FID6711.dat')
+        phi270 = load_image_data('../meas_MID167_trufi_phi270_FID6712.dat')
+        print("All four images loaded...")
+
+        #average the data
+        phi0 = np.average(phi0, axis=3)
+        phi90 = np.average(phi90, axis=3)
+        phi180 = np.average(phi180, axis=3)
+        phi270 = np.average(phi270, axis=3)
+        print("All images averaged....")
+
+        #create a smaller dataset - 2 axis depth will be two
+        # phi0 = phi0[:,:,:1]
+        # phi90 = phi90[:,:,:1]
+        # phi180 = phi180[:,:,:1]
+        # phi270 = phi270[:,:,:1]
+        # print(phi0.shape)
+
+        #concatenate phase-cycled image arrays for usage with Michael's algorithm
+        imgs = np.stack((phi0, phi90, phi180, phi270), axis = 3)
+        # print("Image Data(R): ") #these should match here
+        # print(imgs.shape)
+        # print(" (M): ")
+        # print(imgs2.shape)
+
+        #use elliptical signal model to generate output data from the four input arrays
+        out = self.elliptical_process(phi0, phi90, phi180, phi270, 2)
+        # print("Out Data(R): ")
+        # print(out.shape)
+        # print(" (M): ")
+        # print(out2.shape)
+
+        #things to ask Michael
+        #elliptical signal model, image or kSpace data (should be image data for this class and I think the elliptical model)
+        #four different channels are messing up the elliptical model file Michael gave me
+        #concatenating arrays, how exactly does his imgs array work, same size as Nicholas's input for one image
+
+        #imgs = concat
+        #out = np.array(ellip)
 
         # Crop data
         x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
@@ -39,6 +84,38 @@ class DataSet:
         out = np.swapaxes(out,0,2);
         out = np.swapaxes(out,1,2);
         return imgs, out
+
+    def elliptical_process(self, phi0, phi90, phi180, phi270, iteration_axis):
+    	#depending on direction input, move along 0, 1, or 2 axis
+    	if(iteration_axis == 1): #swap 0 and 1 axes
+    		phi0 = np.swapaxes(phi0,0,1)
+    		phi90 = np.swapaxes(phi90,0,1)
+    		phi180 = np.swapaxes(phi180,0,1)
+    		phi270 = np.swapaxes(phi270,0,1)
+
+    	if(iteration_axis == 2): #swap 0 and 2 axes
+    		phi0 = np.swapaxes(phi0,0,2)
+    		phi90 = np.swapaxes(phi90,0,2)
+    		phi180 = np.swapaxes(phi180,0,2)
+    		phi270 = np.swapaxes(phi270,0,2)
+
+    	out = np.zeros(phi0.shape, dtype=complex) #create return array
+
+    	print("Entering elliptical model recreation...")
+    	# print(phi0.shape[0])
+    	# print(out.shape)
+    	for s in range((int)(phi0.shape[0])): #iterate through all two-dimensional slices in 3D array
+    		print(s)
+    		out[s,:,:] = elliptical_model(phi0[s,:,:], phi90[s,:,:], phi180[s,:,:], phi270[s,:,:])
+
+    	#swap axes back for proper formatting
+    	if(iteration_axis == 1):
+    		out = out.swapaxes(0,1)
+
+    	if(iteration_axis == 2):
+    		out = out.swapaxes(0,2)
+
+    	return out
 
     def load_format_data(self):
          # Separate complex data into real/img components
