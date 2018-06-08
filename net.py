@@ -13,6 +13,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import h5py
 
 from data import DataSet
 import model 
@@ -23,7 +24,7 @@ data.print()
 
 # Training Parameters
 learning_rate = 1e-4
-num_steps = 10000
+num_steps = 3000
 batch_size = 16
 display_step = 100
 
@@ -60,16 +61,23 @@ for step in range(num_steps):
 
     if(step % display_step == 0):
       test_loss = sess.run(loss, feed_dict={ X: data.x_test, Y: data.y_test })
-      print("Step: " + str(step) + " LOSS: " + str(test_loss))
+      print("Step: " + str(step) + " LOSS: %.4e" % test_loss)
       _step.append(step); _loss.append(test_loss) 
 
 # Show results
 prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
 data.plot(data.x_test[0], data.y_test[0], prediction[0])
 
+# Save data in h5py
+hf = h5py.File('data.h5', 'w')
+hf.create_dataset('x_test', data=data.x_test)
+hf.create_dataset('y_test', data=data.y_test)
+hf.create_dataset('results', data=prediction)
+hf.close()
+
 # Plot loss
 plt.plot(_step, np.log10(_loss))
-plt.title('Mean Squared Error (MSE)')
+plt.title('Mean Squared Error (MSE)')  
 plt.xlabel('Epoches')
 plt.ylabel('ln(MSE)')
 plt.show()

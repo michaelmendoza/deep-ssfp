@@ -24,12 +24,15 @@ class DataSet:
 
     def load(self):
         # Load data from matlab data
-        data = sio.loadmat('./data/trainData.mat')
+        #data = sio.loadmat('./data/trainData.mat')
+        data = sio.loadmat('./data/trainData_05091018_3.mat') 
         imgs = np.array(data['imgs'])
         out = np.array(data['em'])
 
         # Crop data
-        x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
+        #x = 132; y = 12; z = 32; wx = 256; wy = 128; wz = 64
+        x = 128; y = 0; z = 32; wx = 256; wy = 256; wz = 64
+
         imgs = imgs[x:x+wx, y:y+wy, z:z+wz, :]
         out = out[x:x+wx, y:y+wy, z:z+wz]
 
