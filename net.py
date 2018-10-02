@@ -19,14 +19,15 @@ from data import DataSet
 import model 
 
 # Import Dataset
-data = DataSet(True)
+modes = DataSet.learningModes;
+data = DataSet(modes[2])
 data.print()
 
 # Training Parameters
 learning_rate = 1e-4
-num_steps = 3000
+num_steps = 10000
 batch_size = 16
-display_step = 100
+display_step = 1000
 
 # Network Parameters 
 WIDTH = data.WIDTH 
@@ -40,7 +41,7 @@ X = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, CHANNELS])  # Input
 Y = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, NUM_OUTPUTS]) # Truth Data - Output
 
 # Define loss and optimizer
-prediction = model.unet(X)
+prediction = model.unet(X, NUM_OUTPUTS)
 loss = tf.reduce_mean(tf.square(prediction - Y))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 trainer = optimizer.minimize(loss)
@@ -66,7 +67,7 @@ for step in range(num_steps):
 
 # Show results
 prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
-data.plot(data.x_test[0], data.y_test[0], prediction[0])
+data.plot2(data.x_test[0], data.y_test[0], prediction[0])
 
 # Save data in h5py
 hf = h5py.File('data.h5', 'w')

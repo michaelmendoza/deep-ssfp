@@ -1,9 +1,7 @@
 
 import tensorflow as tf 
 
-NUM_OUTPUTS = 2
-
-def simple_net(x):
+def simple_net(x, NUM_OUTPUTS = 2):
 
     he_init = tf.contrib.layers.variance_scaling_initializer()
     conv1 = tf.layers.conv2d(x,     32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='h1')
@@ -11,7 +9,7 @@ def simple_net(x):
     prediction = tf.layers.conv2d(conv2, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None, kernel_initializer=he_init, name='output')
     return prediction
 
-def simple_unet(x):
+def simple_unet(x, NUM_OUTPUTS = 2):
 
     he_init = tf.contrib.layers.variance_scaling_initializer()
     conv1 = tf.layers.conv2d(x,     32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv1')
@@ -27,7 +25,9 @@ def simple_unet(x):
     prediction = tf.layers.conv2d(conv6, NUM_OUTPUTS, [1, 1], padding="SAME", activation=None,       kernel_initializer=he_init, name='Output')
     return prediction
 
-def unet(x):
+def unet(x, NUM_OUTPUTS = 2):
+    print('Unet: Output ', NUM_OUTPUTS);
+
     he_init = tf.contrib.layers.variance_scaling_initializer()
     conv1 = tf.layers.conv2d(x,     32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv1')
     conv1 = tf.layers.conv2d(conv1, 32, [3, 3], padding="SAME", activation=tf.nn.relu, kernel_initializer=he_init, name='Conv1-2')

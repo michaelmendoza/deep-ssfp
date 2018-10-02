@@ -6,18 +6,21 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
 
+
 class DataSet:
-    def __init__(self, useSubset=False):
-        if(not useSubset):
-            self.imgs, self.out = self.load_format_data()
-        else:
-             self.imgs, self.out = self.load_format_data_subset()
+
+    learningModes = ['BandRemoval2', 'BandRemoval4', 'SyneticBanding'];
+
+    def __init__(self, learningMode):
+
+        learningFn = [self.load_format_data, self.load_format_data_subset, self.load_format_synthetic_banding];
+        self.imgs, self.out = dict(zip(DataSet.learningModes, learningFn))[learningMode]();
 
         self.SIZE = self.imgs.shape[0]
         self.HEIGHT = self.imgs.shape[1]
         self.WIDTH = self.imgs.shape[2]
         self.CHANNELS_IN = self.imgs.shape[3]
-        self.CHANNELS_OUT = 2
+        self.CHANNELS_OUT = self.out.shape[3]
         self.ratio = 0.8
 
         self.generate();
@@ -74,6 +77,25 @@ class DataSet:
         _out = np.zeros((s[0], s[1], s[2], 2))
         _out[:,:,:,0] = out.real
         _out[:,:,:,1] = out.imag
+        return _imgs, _out
+
+    def load_format_synthetic_banding(self):
+        # Separate complex data into real/img components for only 2 img sets
+
+        imgs, out = self.load()
+
+        s = imgs.shape
+        _imgs = np.zeros((s[0], s[1], s[2], 4))
+        _imgs[:,:,:,0] = imgs[:,:,:,0].real
+        _imgs[:,:,:,1] = imgs[:,:,:,0].imag
+        _imgs[:,:,:,2] = imgs[:,:,:,2].real
+        _imgs[:,:,:,3] = imgs[:,:,:,2].imag
+
+        _out = np.zeros((s[0], s[1], s[2], 4))
+        _out[:,:,:,0] = imgs[:,:,:,1].real
+        _out[:,:,:,1] = imgs[:,:,:,1].imag
+        _out[:,:,:,2] = imgs[:,:,:,3].real
+        _out[:,:,:,3] = imgs[:,:,:,3].imag
         return _imgs, _out
 
     def generate(self):
@@ -153,6 +175,24 @@ class DataSet:
         plt.title('Results')
         plt.axis('off')
         plt.show()  
+
+    def plot2(self, input, output, results):
+        imgs = []
+        imgs.append(input[:,:,0] + 1j * input[:,:,1])
+        imgs.append(input[:,:,2] + 1j * input[:,:,3])
+
+        imgs.append(output[:,:,0] + 1j * output[:,:,1])
+        imgs.append(output[:,:,2] + 1j * output[:,:,3])
+
+        imgs.append(results[:,:,0] + 1j * results[:,:,1])
+        imgs.append(results[:,:,2] + 1j * results[:,:,3])
+
+        count = len(imgs) # Count of plots  
+        for i in range(count):   
+            plt.subplot(1, count, i+1)
+            plt.imshow(np.abs(imgs[i]), cmap='gray')
+            plt.axis('off')
+        plt.show()
 
     def print(self):
         print("Data Split: ", self.ratio)

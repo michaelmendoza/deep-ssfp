@@ -13,6 +13,6 @@ from data import DataSet
 import model 
 
 # Import Dataset
-data = DataSet(True)
+modes = DataSet.learningModes;
+data = DataSet(modes[2])
 data.print()
-
