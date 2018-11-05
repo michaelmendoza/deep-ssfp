@@ -9,18 +9,18 @@ from __future__ import print_function
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-import tensorflow as tf 
+import tensorflow as tf
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import h5py
 
 from data_loader import DataSet
-import model 
+import model
 
 # Import Dataset
 modes = DataSet.learningModes;
-data = DataSet(modes[2])
+data = DataSet(modes[-1])
 data.print()
 
 # Training Parameters
@@ -29,8 +29,8 @@ num_steps = 10000
 batch_size = 16
 display_step = 1000
 
-# Network Parameters 
-WIDTH = data.WIDTH 
+# Network Parameters
+WIDTH = data.WIDTH
 HEIGHT = data.HEIGHT
 CHANNELS = data.CHANNELS_IN
 NUM_INPUTS = WIDTH * HEIGHT * CHANNELS
@@ -46,7 +46,7 @@ loss = tf.reduce_mean(tf.square(prediction - Y))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 trainer = optimizer.minimize(loss)
 
-# Initalize varibles, and run network 
+# Initalize varibles, and run network
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
@@ -63,7 +63,7 @@ for step in range(num_steps):
     if(step % display_step == 0):
       test_loss = sess.run(loss, feed_dict={ X: data.x_test, Y: data.y_test })
       print("Step: " + str(step) + " LOSS: %.4e" % test_loss)
-      _step.append(step); _loss.append(test_loss) 
+      _step.append(step); _loss.append(test_loss)
 
 # Show results
 prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
@@ -78,7 +78,7 @@ hf.close()
 
 # Plot loss
 plt.plot(_step, np.log10(_loss))
-plt.title('Mean Squared Error (MSE)')  
+plt.title('Mean Squared Error (MSE)')
 plt.xlabel('Epoches')
 plt.ylabel('ln(MSE)')
 plt.show()
