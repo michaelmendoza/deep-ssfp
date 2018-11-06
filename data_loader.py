@@ -5,9 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
-import glob
-from mr_utils.load_data import load_raw
-from mr_utils import view
+# import glob
+# from mr_utils.load_data import load_raw
+# from mr_utils import view
 
 class DataSet:
 
@@ -15,7 +15,7 @@ class DataSet:
 
     def __init__(self, learningMode):
 
-        learningFn = [self.load_format_data, self.load_format_data_subset, self.load_format_synthetic_banding, self.load_format_even_odd]
+        learningFn = [self.load_format_data, self.load_format_data_subset, self.load_format_synthetic_banding, self.load_format_even_odd_input_kspace_output_kspace]
         self.imgs, self.out = dict(zip(DataSet.learningModes, learningFn))[learningMode]()
 
         self.SIZE = self.imgs.shape[0]
@@ -27,37 +27,37 @@ class DataSet:
 
         self.generate();
 
-    '''
+    ''' 
     Load raw loader -
     Input: [Depth/Slice, Width, Height, N]
 
     Depth/Slice -> Number of data slices
     N -> Number of phase cycled images
     '''
-    def loadRawData(self,directory):
+    # def loadRawData(self,directory):
 
-        # In the directory provided, find all .dat files
-        files = sorted(glob.glob('%s/*.dat' % directory))
+    #     # In the directory provided, find all .dat files
+    #     files = sorted(glob.glob('%s/*.dat' % directory))
 
-        TEs = [ 3,6,12,24,4,5 ]
-        pcs = [ 0,45,90,135,180,225,270,315 ]
-        pc0 = np.zeros((512,352,8,len(TEs)),dtype='complex')
+    #     TEs = [ 3,6,12,24,4,5 ]
+    #     pcs = [ 0,45,90,135,180,225,270,315 ]
+    #     pc0 = np.zeros((512,352,8,len(TEs)),dtype='complex')
 
-        groups = [ files[ii:ii+len(pcs)] for ii in range(0,len(files),len(pcs))]
-        print(groups)
-        # for file in files:
-        #     # view(file,fft=True,avg_axis=3)
-        #
-        #     # Load, average, then save as npy
-        #     data = load_raw(file)
-        #     data = np.mean(data,axis=3)
-        #     np.save(file,data)
-        #     print('Saved %s' % file)
+    #     groups = [ files[ii:ii+len(pcs)] for ii in range(0,len(files),len(pcs))]
+    #     print(groups)
+    #     # for file in files:
+    #     #     # view(file,fft=True,avg_axis=3)
+    #     #
+    #     #     # Load, average, then save as npy
+    #     #     data = load_raw(file)
+    #     #     data = np.mean(data,axis=3)
+    #     #     np.save(file,data)
+    #     #     print('Saved %s' % file)
 
     def load(self):
         # Load data from matlab data
         #data = sio.loadmat('./data/trainData.mat')
-        data = sio.loadmat('./data/trainData_05091018_3.mat')
+        data = sio.loadmat('./data/trainData_20180509.mat')
         imgs = np.array(data['imgs'])
         out = np.array(data['em'])
 
@@ -127,9 +127,48 @@ class DataSet:
         _out[:,:,:,3] = imgs[:,:,:,3].imag
         return _imgs, _out
 
-    def load_format_even_odd(self):
-        filepath = '/home/nicholas/Documents/rawdata/SSFP_SPECTRAL_IN_VIVO_20181002'
-        imgs,out = self.loadRawData(filepath)
+    def load_format_even_odd_input_kspace_output_kspace(self):
+        
+        # Input images are alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space)
+        # Output is the elliptical singal model in k-space
+
+        imgs, out = self.load()
+        imgs = np.fft.fftshift(np.fft.fft2(imgs,axes=(1,2)),axes=(1,2))
+        out = np.fft.fftshift(np.fft.fft2(out,axes=(1,2)),axes=(1,2))
+
+        s = imgs.shape
+        _imgs = np.zeros((s[0], s[1], s[2], 4))
+        _imgs[:,:,:,0] = imgs[:,:,:,0].real
+        _imgs[:,:,:,1] = imgs[:,:,:,0].imag
+        _imgs[:,:,:,2] = imgs[:,:,:,2].real
+        _imgs[:,:,:,3] = imgs[:,:,:,2].imag
+
+        _out = np.zeros((s[0], s[1], s[2], 2))
+        _out[:,:,:,0] = out.real
+        _out[:,:,:,1] = out.imag
+        
+        _ds = np.zeros((s[0], s[1], s[2], 2))
+        _ds[:,::2,:,0] = _imgs[:,::2,:,0]
+        _ds[:,1::2,:,0] = _imgs[:,1::2,:,2]
+        _ds[:,::2,:,1] = _imgs[:,::2,:,1]
+        _ds[:,1::2,:,1] = _imgs[:,1::2,:,3]
+
+        # tmp = np.zeros(_ds.shape,dtype='complex')
+        # o = 0
+        # tmp[0,o::2,:,0] = _ds[0,o::2,:,0] + 1j*_ds[0,o::2,:,1]
+        # tmp = np.fft.fft2(tmp,axes=(1,2))
+        # plt.subplot(2,1,1)
+        # plt.imshow(np.abs(np.fft.fft2(imgs,axes=(1,2))[0,:,:,0]))
+        # plt.subplot(2,1,2)
+        # plt.imshow(np.abs(tmp[0,:,:,0]))
+        # plt.show()
+
+        return _ds, _out
+
+    def load_format_even_odd_separate_kspace(self):
+        # Input images are even/odd lines of k-space taken from 2 phase cycled acquisitions into 2 separate images (k-space)
+        # Output is the elliptical singal model in k-space
+        pass 
 
     def generate(self):
 
@@ -219,6 +258,28 @@ class DataSet:
 
         imgs.append(results[:,:,0] + 1j * results[:,:,1])
         imgs.append(results[:,:,2] + 1j * results[:,:,3])
+
+        count = len(imgs) # Count of plots
+        for i in range(count):
+            plt.subplot(1, count, i+1)
+            plt.imshow(np.abs(imgs[i]), cmap='gray')
+            plt.axis('off')
+        plt.show()
+
+    def plot_evenodd(self, input, output, results):
+        imgs = []
+
+        inn = input[:,:,0] + 1j * input[:,:,1]
+        imgs.append(inn)
+        imgs.append(np.fft.ifft2(inn))
+
+        out = output[:,:,0] + 1j * output[:,:,1]
+        imgs.append(out)
+        imgs.append(np.fft.ifft2(out))
+
+        res = results[:,:,0] + 1j * results[:,:,1]
+        imgs.append(res)
+        imgs.append(np.fft.ifft2(res))
 
         count = len(imgs) # Count of plots
         for i in range(count):

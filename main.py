@@ -1,7 +1,9 @@
 
+import net
 
 def run():
-    import net
+    #net.runNetwork(3, doRestore = True);
+    net.plotSavedModel(3)
 
 if __name__ == "__main__":
     run()
