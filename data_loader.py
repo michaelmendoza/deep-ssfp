@@ -11,7 +11,7 @@ import scipy.io as sio
 
 class DataSet:
 
-    learningModes = ['BandRemoval2', 'BandRemoval4', 'SyneticBanding', 'EvenOdd'];
+    learningModes = ['BandRemoval2', 'BandRemoval4', 'SyntheticBanding', 'EvenOdd'];
 
     def __init__(self, learningMode):
 
@@ -248,7 +248,7 @@ class DataSet:
         plt.axis('off')
         plt.show()
 
-    def plot2(self, input, output, results):
+    def plot_synthetic_banding(self, input, output, results):
         imgs = []
         imgs.append(input[:,:,0] + 1j * input[:,:,1])
         imgs.append(input[:,:,2] + 1j * input[:,:,3])
@@ -256,8 +256,27 @@ class DataSet:
         imgs.append(output[:,:,0] + 1j * output[:,:,1])
         imgs.append(output[:,:,2] + 1j * output[:,:,3])
 
+        # Run the elliptical model on input dataset as ground truth
+        from mr_utils.recon.ssfp import gs_recon
+        pc0 = input[:,:,0] + 1j*input[:,:,1]
+        pc90 = output[:,:,0] + 1j*output[:,:,1]
+        pc180 = input[:,:,2] + 1j*input[:,:,3]
+        pc270 = output[:,:,2] + 1j*output[:,:,3]
+        recon_truth = gs_recon(pc0,pc90,pc180,pc270)
+        imgs.append(recon_truth)
+
+
         imgs.append(results[:,:,0] + 1j * results[:,:,1])
         imgs.append(results[:,:,2] + 1j * results[:,:,3])
+
+
+        # Run the elliptical model to verify the reconstruction
+        pc0 = input[:,:,0] + 1j*input[:,:,1]
+        pc90 = results[:,:,0] + 1j*results[:,:,1]
+        pc180 = input[:,:,2] + 1j*input[:,:,3]
+        pc270 = results[:,:,2] + 1j*results[:,:,3]
+        recon_using_prediction = gs_recon(pc0,pc90,pc180,pc270)
+        imgs.append(recon_using_prediction)
 
         count = len(imgs) # Count of plots
         for i in range(count):

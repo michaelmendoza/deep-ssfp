@@ -35,7 +35,7 @@ def runNetwork(modeindex, doRestore = False):
     batch_size = 16
     display_step = 1000
     save_step = 10000
-
+    
     # Network Parameters
     WIDTH = data.WIDTH
     HEIGHT = data.HEIGHT
@@ -95,10 +95,7 @@ def runNetwork(modeindex, doRestore = False):
     # Show results
     prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
 
-    if modeindex == 3:
-        data.plot_evenodd(data.x_test[0], data.y_test[0], prediction[0])
-    else:
-        data.plot2(data.x_test[0], data.y_test[0], prediction[0])
+    plot(data, prediction, modeindex, 0)
 
     # Plot loss
     plt.plot(_step, np.log10(_loss_train), label='training loss')
@@ -127,7 +124,7 @@ def plotSavedModel(modeindex):
     X = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, CHANNELS])  # Input
     Y = tf.placeholder(tf.float32, [None, HEIGHT, WIDTH, NUM_OUTPUTS]) # Truth Data - Output
     global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
-    
+
     # Define loss and optimizer
     prediction = model.unet(X, NUM_OUTPUTS)
 
@@ -150,7 +147,12 @@ def plotSavedModel(modeindex):
 
         index = np.random.randint(data.x_test.shape[0])
         print('Selecting Test Image #', index)
-        if modeindex == 3:
-            data.plot_evenodd(data.x_test[index], data.y_test[index], prediction[index])
-        else:
-            data.plot2(data.x_test[index], data.y_test[index], prediction[index])
+        plot(data, prediction, modeindex, index)
+
+def plot(data, prediction, modeindex, index = 0):
+    if modeindex == 3:
+        data.plot_evenodd(data.x_test[index], data.y_test[index], prediction[index])
+    elif modeindex == 2:
+        data.plot_synthetic_banding(data.x_test[index], data.y_test[index], prediction[index])
+    else:
+        data.plot(data.x_test[index], data.y_test[index], prediction[index])
