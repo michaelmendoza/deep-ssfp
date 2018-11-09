@@ -5,13 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import scipy.io as sio
+from mr_utils.recon.ssfp import gs_recon
+from mr_utils import view
 # import glob
 # from mr_utils.load_data import load_raw
 # from mr_utils import view
 
 class DataSet:
 
-    learningModes = ['BandRemoval2', 'BandRemoval4', 'SyntheticBanding', 'EvenOdd'];
+    learningModes = ['BandRemoval2', 'BandRemoval4', 'SyntheticBanding', 'EvenOdd']
 
     def __init__(self, learningMode):
 
@@ -75,6 +77,27 @@ class DataSet:
         out = np.swapaxes(out,1,2);
         return imgs, out
 
+    def load_brain(self):
+        # Load npy data for each phase cycle
+        pc0 = np.load('./data/brain/meas_MID23_TRUFI_STW_TE2_5_FID33594.dat_avg_coil_combined.npy')
+        pc90 = np.load('./data/brain/meas_MID24_TRUFI_STW_TE2_5_dphi_90_FID33595.dat_avg_coil_combined.npy')
+        pc180 = np.load('./data/brain/meas_MID25_TRUFI_STW_TE2_5_dphi_180_FID33596.dat_avg_coil_combined.npy')
+        pc270 = np.load('./data/brain/meas_MID26_TRUFI_STW_TE2_5_dphi_270_FID33597.dat_avg_coil_combined.npy')
+
+        # Shape should be (z,x,y,pc)
+        imgs = np.stack((pc0,pc90,pc180,pc270)).transpose((3,1,2,0))
+        # view(imgs.T)
+        # out = np.stack((pc90,pc270)).transpose((3,1,2,0))
+
+        # Output should be solution to ESM for each slice
+        out = np.zeros((imgs.shape[0],imgs.shape[1],imgs.shape[2]),dtype='complex')
+        for kk in range(imgs.shape[0]):
+            out[kk,...] = gs_recon(pc0[...,kk],pc90[...,kk],pc180[...,kk],pc270[...,kk])
+        # view(out)
+
+        return imgs,out
+
+
     def load_format_data(self):
          # Separate complex data into real/img components
 
@@ -111,6 +134,7 @@ class DataSet:
     def load_format_synthetic_banding(self):
         # Separate complex data into real/img components for only 2 img sets
 
+        #imgs, out = self.load_brain() 
         imgs, out = self.load()
 
         s = imgs.shape
@@ -126,6 +150,40 @@ class DataSet:
         _out[:,:,:,2] = imgs[:,:,:,3].real
         _out[:,:,:,3] = imgs[:,:,:,3].imag
         return _imgs, _out
+
+    def load_format_even_odd_input_kspace_output_kspace_data_consistency(self):
+        # Input images are alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space)
+        # Output is the elliptical singal model in k-space and fully sampled input images
+
+        imgs, out = self.load()
+        imgs = np.fft.fftshift(np.fft.fft2(imgs,axes=(1,2)),axes=(1,2))
+        out = np.fft.fftshift(np.fft.fft2(out,axes=(1,2)),axes=(1,2))
+
+        s = imgs.shape
+        _imgs = np.zeros((s[0], s[1], s[2], 4))
+        _imgs[:,:,:,0] = imgs[:,:,:,0].real
+        _imgs[:,:,:,1] = imgs[:,:,:,0].imag
+        _imgs[:,:,:,2] = imgs[:,:,:,2].real
+        _imgs[:,:,:,3] = imgs[:,:,:,2].imag
+
+        _out = np.zeros((s[0], s[1], s[2], 6))
+        _out[:,:,:,0] = out.real
+        _out[:,:,:,1] = out.imag
+
+        # Enforce data consistency with additional "decoder"
+        _out[:,:,:,2] = _imgs[:,:,:,0]
+        _out[:,:,:,3] = _imgs[:,:,:,1]
+        _out[:,:,:,4] = _imgs[:,:,:,2]
+        _out[:,:,:,5] = _imgs[:,:,:,3]
+        
+        _ds = np.zeros((s[0], s[1], s[2], 2))
+        _ds[:,::2,:,0] = _imgs[:,::2,:,0]
+        _ds[:,1::2,:,0] = _imgs[:,1::2,:,2]
+        _ds[:,::2,:,1] = _imgs[:,::2,:,1]
+        _ds[:,1::2,:,1] = _imgs[:,1::2,:,3]
+
+
+        return _ds, _out
 
     def load_format_even_odd_input_kspace_output_kspace(self):
         
@@ -289,15 +347,15 @@ class DataSet:
         imgs = []
 
         inn = input[:,:,0] + 1j * input[:,:,1]
-        imgs.append(inn)
+        imgs.append(np.abs(np.log(inn)))
         imgs.append(np.fft.ifft2(inn))
 
         out = output[:,:,0] + 1j * output[:,:,1]
-        imgs.append(out)
+        imgs.append(np.abs(np.log(out)))
         imgs.append(np.fft.ifft2(out))
 
         res = results[:,:,0] + 1j * results[:,:,1]
-        imgs.append(res)
+        imgs.append(np.abs(np.log(res)))
         imgs.append(np.fft.ifft2(res))
 
         count = len(imgs) # Count of plots

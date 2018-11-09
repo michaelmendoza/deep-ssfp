@@ -21,6 +21,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from time import time
+from skimage.measure import compare_ssim,compare_mse,compare_psnr
 
 def runNetwork(modeindex, doRestore = False):
 
@@ -31,11 +32,11 @@ def runNetwork(modeindex, doRestore = False):
 
     # Training Parameters
     learning_rate = 1e-4
-    num_steps = 50000
+    num_steps = 30000
     batch_size = 16
-    display_step = 1000
+    display_step = 500
     save_step = 10000
-    
+
     # Network Parameters
     WIDTH = data.WIDTH
     HEIGHT = data.HEIGHT
@@ -145,7 +146,11 @@ def plotSavedModel(modeindex):
         # Show results
         prediction = sess.run(prediction, feed_dict={ X: data.x_test, Y: data.y_test })
 
-        index = np.random.randint(data.x_test.shape[0])
+        # Compute metrics of prediction
+        metrics = do_metrics(prediction,data)
+
+        # index = np.random.randint(data.x_test.shape[0])
+        index = 4
         print('Selecting Test Image #', index)
         plot(data, prediction, modeindex, index)
 
@@ -156,3 +161,33 @@ def plot(data, prediction, modeindex, index = 0):
         data.plot_synthetic_banding(data.x_test[index], data.y_test[index], prediction[index])
     else:
         data.plot(data.x_test[index], data.y_test[index], prediction[index])
+
+
+def do_metrics(prediction, data):
+
+    # Prediction looks like: (slice,x,y,pc)
+    ssim = []
+    mse = []
+    psnr = []
+    for kk in range(prediction.shape[0]):
+        im1 = prediction[kk,...]
+        im2 = data.y_test[kk,...]
+
+        ssim.append(compare_ssim(im1,im2,multichannel=True))
+        mse.append(compare_mse(im1,im2))
+        psnr.append(compare_psnr(im2,im1))
+
+        
+
+    print('Average MSE',np.mean(mse))
+    print('STD MSE',np.std(mse))
+
+    print('Average Mean Structural Similarity',np.mean(ssim))
+    print('STD Mean Structural Similarity',np.std(ssim))
+
+    print('Average Peak SNR',np.mean(psnr))
+    print('STD Peak SNR',np.std(psnr))
+
+if __name__ == '__main__':
+
+    plotSavedModel(2)
