@@ -15,7 +15,7 @@ def view3D( data3D, filename='_.gif', path='./images/' ):
         ax.imshow(abs(data3D[frame_num,:,:]), cmap='gray')
         return ax
 
-    anim = FuncAnimation(fig, animate, frames=data3D.shape[2], interval=1)
+    anim = FuncAnimation(fig, animate, frames=data3D.shape[0], interval=1)
 
     isExist = os.path.exists(path)
     if not isExist:
@@ -24,3 +24,6 @@ def view3D( data3D, filename='_.gif', path='./images/' ):
     path = os.path.join(path, filename)
     print(path)
     anim.save(path)
+
+def view3d( data3D, filename='_.gif', path='./images/' ):
+    view3D( data3D, filename, path)
