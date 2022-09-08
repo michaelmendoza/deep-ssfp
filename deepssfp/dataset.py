@@ -68,10 +68,13 @@ class Dataset:
         return data
 
     def save(self):
-        pass
+        filename = 'deep_ssfp_phantom_dataset'
+        np.save(filename, [self])
 
-    def load(self):
-        pass
+    @classmethod
+    def load(cls):
+        ds = np.load('./deep_ssfp_phantom_dataset.npy', allow_pickle=True)
+        return ds
 
     def plot(self):
         pass
