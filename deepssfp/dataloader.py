@@ -14,6 +14,10 @@ def load():
 
     m = np.concatenate(tuple(M), axis=0)
 
+    # Crop to [:,128,128,:]
+    x0 = 32; dx = 128; y0 = 12; dy = 128
+    m = m[:, y0:y0+dy, x0:x0+dx, :]
+
     em = []
     for slice in range(m.shape[0]):
         em.append(recon.gs_recon(m[slice,:,:,:], pc_axis=2))

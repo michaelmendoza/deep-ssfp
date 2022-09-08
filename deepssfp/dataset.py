@@ -2,9 +2,8 @@ import numpy as np
 from deepssfp import dataloader, dataformatter
 
 modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd']
-class Dataset:
 
-    modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd']
+class Dataset:
 
     def __init__(self, mode):
         
@@ -74,7 +73,7 @@ class Dataset:
     @classmethod
     def load(cls):
         ds = np.load('./deep_ssfp_phantom_dataset.npy', allow_pickle=True)
-        return ds
+        return ds[0]
 
     def plot(self):
         pass
