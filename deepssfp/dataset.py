@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from deepssfp import dataloader, dataformatter
 
 modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd']
@@ -38,8 +39,8 @@ class Dataset:
         self.output = self.y[indices]
 
         # Setup data
-        self.input = self.MinMaxScalerByImage(self.input)
-        self.output = self.MinMaxScalerByImage(self.output)
+        self.input, input_mean, input_std = self.StandardScaler(self.input)
+        self.output, output_mean, output_std = self.StandardScaler(self.output)
 
         # Split data into test/training sets
         index = int(self.ratio * len(self.input)) # Split index
@@ -77,3 +78,14 @@ class Dataset:
 
     def plot(self):
         pass
+
+    def histogram(self):
+
+        n_bins = 20
+        dist1 = self.input.reshape(-1)
+        dist2 = self.output.reshape(-1)
+
+        fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+
+        axs[0].hist(dist1, bins=n_bins)
+        axs[1].hist(dist2, bins=n_bins)

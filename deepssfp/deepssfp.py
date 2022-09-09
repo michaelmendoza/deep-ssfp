@@ -7,10 +7,9 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from deepssfp import dataset, models
 
-def train():
+def train(epochs = 200):
 
     # Training Parameters
-    epochs = 100
     batch_size = 16
     test_batch_size = 8
     validation_split = 0.2
@@ -39,12 +38,13 @@ def train():
     CHANNELS = 8
     NUM_OUTPUTS = 2
 
-    model = models.unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+    #model = models.unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
     #model = models.simple_conv(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+    model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
 
     model.compile(optimizer='adam', 
-                    loss='mean_squared_error', 
-                    metrics=[tf.keras.metrics.MeanSquaredError()])
+                    loss=tf.keras.losses.MeanSquaredError(), 
+                    metrics=[tf.keras.metrics.MeanAbsoluteError()])
     model.summary()
 
     start = time.time()

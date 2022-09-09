@@ -9,7 +9,7 @@ def simple_conv(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
     xin = keras.Input(shape=(HEIGHT, WIDTH, CHANNELS), name='img')
     x = Conv2D(32, (3, 3), padding="same", activation=tf.nn.relu)(xin)
     x = Conv2D(32, (3, 3), padding="same", activation=tf.nn.relu)(x)
-    xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=tf.nn.softmax)(x)
+    xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=None)(x)
     return tf.keras.Model(inputs=xin, outputs=xout)
 
 def unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
@@ -59,7 +59,7 @@ def unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
     x = Conv2D(32, (3, 3), padding="same", activation=tf.nn.relu,  kernel_initializer=he_init)(x)
     x = Conv2D(32, (3, 3), padding="same", activation=tf.nn.relu,  kernel_initializer=he_init)(x)
     
-    xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=tf.nn.softmax)(x)
+    xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=None)(x)
     return tf.keras.Model(inputs=xin, outputs=xout)
 
 # Unet Model Architecture
@@ -103,7 +103,7 @@ def unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
             idx = fdepth - idx - 2
             x = up_block(x, fn[idx], x_stack.pop())
 
-        xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=tf.nn.softmax)(x)
+        xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=None)(x)
         return tf.keras.Model(inputs=xin, outputs=xout)
 
     return unet()

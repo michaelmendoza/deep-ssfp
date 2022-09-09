@@ -14,10 +14,6 @@ def load():
 
     m = np.concatenate(tuple(M), axis=0)
 
-    # Crop to [:,128,128,:]
-    x0 = 32; dx = 128; y0 = 12; dy = 128
-    m = m[:, y0:y0+dy, x0:x0+dx, :]
-
     em = []
     for slice in range(m.shape[0]):
         em.append(recon.gs_recon(m[slice,:,:,:], pc_axis=2))
@@ -43,11 +39,16 @@ def load_data_and_prepare(files):
     # Load data from file
     M = []
     for file in files:
-        data = read_rawdata(file, is3D=True, doChaAverage = True, doAveAverage = True);
+        data = read_rawdata(file, is3D=True, doChaAverage = True, doAveAverage = True)
         M.append(data['data'])
     
     # Prepare data 
     m = np.stack(M[0:4], axis=-1)
+
+    # Crop to [64:,128,128,:]
+    x0 = 32; dx = 128; y0 = 12; dy = 128; z0=32; dz = 64
+    m = m[z0:z0+dz, y0:y0+dy, x0:x0+dx, :]
+
     return m
     
 def read_rawdata(filepath, datatype='image', is3D=False, doChaAverage = True, doChaSOSAverage = False, doAveAverage = True):
