@@ -1,3 +1,4 @@
+import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 from deepssfp import dataloader, dataformatter
@@ -7,13 +8,9 @@ modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd
 class Dataset:
 
     def __init__(self, mode):
-        
-        x, y = dataloader.load()
-        x, y = dataformatter.format_and_prepare_data(x, y, mode)
 
         self.mode = mode
-        self.x = x
-        self.y = y
+        self.x, self.y = self.load_data()
 
         self.SIZE = self.x.shape[0]
         self.HEIGHT = self.x.shape[1]
@@ -30,7 +27,15 @@ class Dataset:
     def __repr__(self) -> str:
         return f'dataset.Dataset({self.mode})'
 
+    def load_data(self):
+        ''' Load, format and prepare data for dataset '''
+
+        x, y = dataloader.load()
+        x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
+        return x, y
+
     def generate(self):
+        ''' Generates training/test dataset '''
 
         # Shuffle data
         indices = np.arange(self.SIZE)
@@ -50,11 +55,13 @@ class Dataset:
         self.y_test = self.output[index:]
 
     def next_batch(self, batch_size):
+        ''' Retrieves next samples of training data '''
         length = self.input.shape[0]
         indices = np.random.randint(0, length, batch_size)
         return [self.input[indices], self.output[indices]]
 
     def StandardScaler(self, data):
+        ''' Scales data using mean/std statistics '''
         mean = np.mean(data)
         std = np.std(data)
         return (data - mean) / std, mean, std
@@ -67,20 +74,11 @@ class Dataset:
         data = np.reshape(data, (s[0], s[1], s[2], s[3]))
         return data
 
-    def save(self):
-        filename = 'deep_ssfp_phantom_dataset'
-        np.save(filename, [self])
-
-    @classmethod
-    def load(cls):
-        ds = np.load('./deep_ssfp_phantom_dataset.npy', allow_pickle=True)
-        return ds[0]
-
     def plot(self):
         pass
 
     def histogram(self):
-
+        ''' Plots histogram plots of input/output data '''
         n_bins = 20
         dist1 = self.input.reshape(-1)
         dist2 = self.output.reshape(-1)
