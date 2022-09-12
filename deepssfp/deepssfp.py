@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from deepssfp import dataset, models
 
-def train(epochs = 200):
+def train(mode = dataset.modes[0], epochs = 200):
 
     # Training Parameters
     batch_size = 16
@@ -15,8 +15,7 @@ def train(epochs = 200):
     validation_split = 0.2
     shuffle = True
 
-    mode = dataset.modes[0]
-    ds = dataset.Dataset.load()
+    ds = dataset.Dataset(mode)
 
     x_train = ds.x_train
     y_train = ds.y_train
@@ -35,12 +34,13 @@ def train(epochs = 200):
     # Network Parameters
     WIDTH = ds.WIDTH
     HEIGHT = ds.HEIGHT
-    CHANNELS = 8
-    NUM_OUTPUTS = 2
+    CHANNELS = ds.CHANNELS_IN
+    NUM_OUTPUTS = ds.CHANNELS_OUT
 
     #model = models.unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
     #model = models.simple_conv(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
     model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+    print(f'DL Model: {HEIGHT}, {WIDTH}, {CHANNELS}, {NUM_OUTPUTS}')
 
     model.compile(optimizer='adam', 
                     loss=tf.keras.losses.MeanSquaredError(), 
@@ -53,7 +53,8 @@ def train(epochs = 200):
             epochs=epochs, 
             steps_per_epoch=20,
             validation_data=valid_dataset,
-            validation_steps = 10)    
+            validation_steps = 10,
+            verbose=2)
     
     evaluation = model.evaluate(x_test, y_test, verbose=1)
     predictions = model.predict(x_test)
@@ -62,4 +63,4 @@ def train(epochs = 200):
     print("Training Complete.")
     print('Summary: Loss: %.2f Time Elapsed: %.2f seconds' % (evaluation[1], (end - start)) )
     
-    return model, history, evaluation, predictions
+    return model, history, ds, predictions

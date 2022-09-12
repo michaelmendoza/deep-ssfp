@@ -1,34 +1,32 @@
 import numpy as np
 
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd']
+modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'SuperFOV']
 
 def format_and_prepare_data(x, y, mode):
     ''' Formats and prepares data for deepssfp experiments:
         1) BandRemoval:4 - Transforms complex data into real/img components
         2) BandRemoval:2 - Takes a subset of x data and transforms complex data into real/img components
         3) SyntheticBanding:1_3->2_4 - Takes alternating subsets of data and transforms complex data into real/img components
-        4) EvenOdd - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
+        4) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
     '''
     if mode == 'BandRemoval:4':
         pass
     elif mode == 'BandRemoval:2':
         x = x[:,:,:,::2]
     elif mode == 'SyntheticBanding:1_3->2_4':
-        x = x[:,:,:,::2]
         y = x[:,:,:,1::2]
-        pass
-    elif mode == 'EvenOdd':
+        x = x[:,:,:,::2]
+    elif mode == 'SuperFOV':
         x = x[:,:,:,::2]
         x = np.fft.fftshift(np.fft.fft2(x, axes=(1,2)), axes=(1,2))
         y = np.fft.fftshift(np.fft.fft2(y, axes=(1,2)), axes=(1,2))
-        pass
     else:
         raise Exception('Invalid data mode')
 
     x = complex_to_real_img(x)
     y = complex_to_real_img(y)
 
-    if mode == 'EvenOdd':
+    if mode == 'SuperFOV':
         sx = x.shape
         _x = np.zeros((sx[0], sx[1], sx[2], 2))
         _x[:,::2,:,0] = x[:,::2,:,0]

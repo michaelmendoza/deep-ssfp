@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from deepssfp import dataloader, dataformatter
 
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'EvenOdd']
+modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'SuperFOV']
 
 class Dataset:
 
