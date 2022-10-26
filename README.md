@@ -1,10 +1,15 @@
 # DeepSSFP 
 
-DeepSSFP is library for medical imaging using SSFP. This library contains code implementations for a variety of deep learning techniques for accelerated bSSFP MRI imaging. These techiques are as follows:
+DeepSSFP is library for image reconstuction for bSSFP. This library contains code implementations for a variety of deep learning techniques for accelerated bSSFP MRI imaging. These techiques are as follows:
 
 1. Deep Learning for bSSFP Banding Reduction
 2. Synthetic Banding for bSSFP Data Augmentation
 3. Deep Learning Super-FOV for Accelerated bSSFP Banding Reduction
+
+## Introduction
+
+SSFP is sensitive to off-resonance effects, which cause banding artifacts. Multiple SSFP images with different phase cycle amounts can be combined to suppress banding artifacts. Multiple methods for band suppression have been developed over the years, but each method has limitations. Often the most significant limitation for effective band reduction is the number of
+phased-cycled SSFP images required. Our research aimed to develop a machine learning-based model to combine multiple bSSFP images for improved banding artifact suppression with a reduced number of bSSFP acquisitions.
 
 ## Notebooks
 
