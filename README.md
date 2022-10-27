@@ -15,7 +15,7 @@ SSFP is sensitive to off-resonance effects, which cause banding artifacts. Multi
 
 Jupyter notebooks for examples of how to use the DeepSSFP library.
 
-1. Deep Learning bSSFP Banding Reduction ([notebook](notebooks/deepssfp_bandremoval2_experiment_v0.ipynb))
+1. Deep Learning bSSFP Banding Reduction ([notebook](notebooks/deepssfp_bandremoval4_experiment_v0.ipynb))
 2. Super-FOV for Accelerated bSSFP Banding Reduction ([notebook](notebooks/deepssfp_superfov_experiment_v0.ipynb))
 3. Synthetic Banding for bSSFP Data Augmentation ([notebook](notebooks/deepssfp_syntheticbanding_experiment_v0.ipynb))
 
@@ -71,6 +71,9 @@ We present a machine learning technique for bSSFP band removal using two undersa
 <p align="center">
   <img src="assets/sFOV-results.png" width="600">
 </p>
+
+
+In our method, Undersampled k-space data from two phase-cycled acquisitions is fed to the model as input. The output is compared using mean squared error to the geometric solution to the elliptical signal model generated from four fully sampled phase-cycled acquisitions. The results of the technique show that our method is capable of generating banding artifact-free images of simliar quality compared to traditional methods with undersampled data. 
 
 ### Synthetic Banding for bSSFP Data Augmentation
 
