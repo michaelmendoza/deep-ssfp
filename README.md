@@ -43,7 +43,7 @@ npm run api
 
 ## Features
 
-Implementations variety of deep learning techniques SSFP Band Removal is incomed in this library. 
+Implementations variety of deep learning techniques SSFP Band Removal is included in this library. 
 
 ### Deep Learning for bSSFP Banding Reduction
 
@@ -81,11 +81,13 @@ In our method, Undersampled k-space data from two phase-cycled acquisitions is f
   <img src="assets/SyntheticBanding-diagram.png" width="600">
 </p>
 
-We present a deep learning method for synthesizing additional phase-cycled images from a set of at least two phase-cycled images that can be used with existing band reduction techniques to reduce scan time.
+We present a deep learning method for synthesizing additional phase-cycled images from a subset of images that can be used with existing band reduction techniques to reduce scan time. Additionally, this method can be used for quantitative parameter biomarker estimation to reduce the number of images required in T1/T2 map estimation techiqiues such as PLANET.
 
 <p align="center">
   <img src="assets/SyntheticBanding-results.png" width="600">
 </p>
+
+Examples of synthetically genearted images are demonstated above where 2 phase cycled images (0 &deg;, 180 &deg;) are used to generate 2 other phase cycled images (90 &deg;, 270 &deg;). These results show that the technique is capable of generating accurate synthetic phase cycled images.
 
 <p align="center">
   <img src="assets/SyntheticBanding-diagram2.png" width="600">
@@ -95,4 +97,5 @@ We present a deep learning method for synthesizing additional phase-cycled image
   <img src="assets/SyntheticBanding-results2.png" width="600">
 </p>
 
+The functionality of this techique is validated by using synthetically generated images to create a band free image using the elliptical singal model techique for band reduction. This was compared to the traditional method for banding artifact reduction. The results show that our method is comparable to the more traditonal techique with few input images.
 
