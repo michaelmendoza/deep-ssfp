@@ -5,11 +5,11 @@ DeepSSFP is library for image reconstuction for bSSFP. This library contains cod
 1. Deep Learning for bSSFP Banding Reduction
 2. Deep Learning Super-FOV for Accelerated bSSFP Banding Reduction
 3. Synthetic Banding for bSSFP Data Augmentation for Banding Reduction
-4. Synthetic Banding for bSSFP Data Augmentation for T1/T2 Mapping
+4. Synthetic Banding for bSSFP Data Augmentation for T1/T2 Map Estimation
 
 ## Introduction
 
-SSFP is sensitive to off-resonance effects, which cause banding artifacts. Multiple SSFP images with different phase cycle amounts can be combined to suppress banding artifacts. Multiple methods for band suppression have been developed over the years, but each method has limitations. Often the most significant limitation for effective band reduction is the number of phased-cycled SSFP images required. Our research aimed to develop a machine learning-based model to combine multiple bSSFP images for improved banding artifact suppression with a reduced number of bSSFP acquisitions.
+SSFP is sensitive to off-resonance effects, which cause banding artifacts. Multiple SSFP images with different phase cycle amounts can be combined to suppress banding artifacts and for the estimation of quantitative biomarker like T1/T2 relaxation parameter mappings. Multiple methods for band suppression have been developed over the years, but each method has limitations. Often the most significant limitation for effective band reduction is the number of phased-cycled SSFP images required. Our research aimed to develop a machine learning-based model to combine multiple bSSFP images for improved banding artifact suppression and quantitative biomarker estimation with a reduced number of bSSFP acquisitions.
 
 ## Notebooks
 
