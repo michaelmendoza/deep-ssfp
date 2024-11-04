@@ -2,6 +2,7 @@ import os
 import numpy as np
 import mapvbvd
 from pathlib import Path
+from typing import List, Dict, Any, Optional
 
 from deepssfp import recon
 
@@ -76,51 +77,53 @@ def load_data_and_prepare(files):
 
     return m
     
-def read_rawdata(filepath, datatype='image', is3D=False, doChaAverage = True, doChaSOSAverage = False, doAveAverage = True):
-    ''' Reads rawdata files and returns NodeDataset '''
-
+def read_rawdata(filepath: str, datatype: str = 'image', doChaAverage: bool = True, doChaSOSAverage: bool = False, doAveAverage: bool = True) -> Dict[str, Any]:
+    """Read raw data file and return data dictionary."""
     twixObj = mapvbvd.mapVBVD(filepath)
-    sqzDims = twixObj.image.sqzDims    
     twixObj.image.squeeze = True
-
     data = twixObj.image['']
-    # Move Lin be first index
+    sqzDims = twixObj.image.sqzDims.copy()  # Create a copy to modify
+
+    # Move Lin to be first index
     linIndex = sqzDims.index('Lin')
     data = np.moveaxis(data, linIndex, 0)
     sqzDims.insert(0, sqzDims.pop(linIndex))
 
+    # Process data based on options
     if doAveAverage and 'Ave' in sqzDims:
-        chaIndex = sqzDims.index('Ave')
-        data = np.mean(data, axis=chaIndex)
-        sqzDims.pop(chaIndex)
-                
-    if is3D:
-        if 'Par' in sqzDims:
-            sliceIndex = sqzDims.index('Par')
-            data = np.moveaxis(data, sliceIndex, 0)
-            sqzDims.insert(0, sqzDims.pop(sliceIndex))
+        ave_index = sqzDims.index('Ave')
+        data = np.mean(data, axis=ave_index)
+        sqzDims.pop(ave_index)
+
+    if 'Par' in sqzDims:
+        slice_index = sqzDims.index('Par')
+        data = np.moveaxis(data, slice_index, 0)
+        sqzDims.insert(0, sqzDims.pop(slice_index))
 
     if datatype == 'image':
-        if is3D:
+        if 'Par' in sqzDims:
             data = np.fft.fftshift(np.fft.ifftn(np.fft.fftshift(data, axes=(0,1,2))))
         else:
             data = np.fft.fftshift(np.fft.ifft2(np.fft.fftshift(data, axes=(0, 1)), axes=(0, 1)), axes=(0, 1))
-    else: # datatype is kspace
-        pass
 
     if (doChaAverage or doChaSOSAverage) and 'Cha' in sqzDims:
-        chaIndex = sqzDims.index('Cha')
-
+        cha_index = sqzDims.index('Cha')
         if doChaAverage:
-            data = np.mean(data, axis=chaIndex)
+            data = np.mean(data, axis=cha_index)
         elif doChaSOSAverage:
-            data = np.sqrt(np.sum(data**2, axis=(chaIndex)))
-
-        sqzDims.pop(chaIndex)
+            data = np.sqrt(np.sum(data**2, axis=cha_index))
+        sqzDims.pop(cha_index)
 
     if 'Sli' in sqzDims:
-        sliceIndex = sqzDims.index('Sli')
-        data = np.moveaxis(data, sliceIndex, 0)
-        sqzDims.insert(0, sqzDims.pop(sliceIndex))
+        slice_index = sqzDims.index('Sli')
+        data = np.moveaxis(data, slice_index, 0)
+        sqzDims.insert(0, sqzDims.pop(slice_index))
 
-    return { 'data':data, 'dims':sqzDims, 'shape':data.shape } 
+    return {
+        'data': data,
+        'dims': sqzDims,
+        'shape': data.shape,
+        'min': float(np.nanmin(np.abs(data))),
+        'max': float(np.nanmax(np.abs(data))),
+        'isComplex': np.iscomplexobj(data)
+    }
