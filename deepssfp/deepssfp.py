@@ -7,15 +7,40 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from deepssfp import dataset, models
 
-def train(mode = dataset.modes[0], epochs = 200):
-
+def train(mode=dataset.modes[0], epochs=200, model_dir='saved_models', 
+          continue_training=False, input_data=None, output_data=None):
+    """Train the DeepSSFP model with support for saving and loading weights.
+    
+    Parameters
+    ----------
+    mode : str
+        Training mode from dataset.modes
+    epochs : int
+        Number of epochs to train
+    model_dir : str
+        Directory to save/load model weights
+    continue_training : bool
+        If True, load existing weights when available
+    input_data : ndarray, optional
+        Custom input data of shape [slices, height, width, phase_cycles]
+    output_data : ndarray, optional
+        Custom output/target data of shape [slices, height, width, channels]
+    """
+    
     # Training Parameters
     batch_size = 16
     test_batch_size = 8
     validation_split = 0.2
     shuffle = True
 
-    ds = dataset.Dataset(mode)
+    # Create model directory if it doesn't exist
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # Generate a model name based on the mode and parameters
+    model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
+    model_path = os.path.join(model_dir, model_name)
+
+    ds = dataset.Dataset(mode, input_data, output_data)
 
     x_train = ds.x_train
     y_train = ds.y_train
@@ -37,30 +62,66 @@ def train(mode = dataset.modes[0], epochs = 200):
     CHANNELS = ds.CHANNELS_IN
     NUM_OUTPUTS = ds.CHANNELS_OUT
 
-    #model = models.unet_model_0(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
-    #model = models.simple_conv(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+    # Create model
     model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
     print(f'DL Model: {HEIGHT}, {WIDTH}, {CHANNELS}, {NUM_OUTPUTS}')
 
     model.compile(optimizer='adam', 
-                    loss=tf.keras.losses.MeanSquaredError(), 
-                    metrics=[tf.keras.metrics.MeanAbsoluteError()])
+                 loss=tf.keras.losses.MeanSquaredError(), 
+                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
+    
+    # Load weights if continuing training and weights exist
+    initial_epoch = 0
+    if continue_training and os.path.exists(f"{model_path}.index"):
+        print(f"Loading existing model weights from {model_path}")
+        model.load_weights(model_path)
+        
+        # Load training history if it exists
+        history_path = f"{model_path}_history.npy"
+        if os.path.exists(history_path):
+            print("Loading training history")
+            history_dict = np.load(history_path, allow_pickle=True).item()
+            initial_epoch = len(history_dict['loss'])
+            print(f"Continuing training from epoch {initial_epoch}")
+    
     model.summary()
 
+    # Create ModelCheckpoint callback to save best weights
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        model_path,
+        save_weights_only=True,
+        save_best_only=True,
+        monitor='val_loss',
+        mode='min',
+        verbose=1
+    )
+
     start = time.time()
-    #history = model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=validation_split, shuffle=shuffle)
-    history = model.fit(train_dataset, 
-            epochs=epochs, 
-            steps_per_epoch=20,
-            validation_data=valid_dataset,
-            validation_steps = 10,
-            verbose=2)
+    history = model.fit(
+        train_dataset, 
+        epochs=epochs,
+        initial_epoch=initial_epoch,
+        steps_per_epoch=20,
+        validation_data=valid_dataset,
+        validation_steps=10,
+        verbose=2,
+        callbacks=[checkpoint_callback]
+    )
+    
+    # Save training history
+    history_dict = {
+        'loss': history.history['loss'],
+        'val_loss': history.history['val_loss'],
+        'mean_absolute_error': history.history['mean_absolute_error'],
+        'val_mean_absolute_error': history.history['val_mean_absolute_error']
+    }
+    np.save(f"{model_path}_history.npy", history_dict)
     
     evaluation = model.evaluate(x_test, y_test, verbose=1)
     predictions = model.predict(x_test)
     end = time.time()
 
     print("Training Complete.")
-    print('Summary: Loss: %.2f Time Elapsed: %.2f seconds' % (evaluation[1], (end - start)) )
+    print('Summary: Loss: %.2f Time Elapsed: %.2f seconds' % (evaluation[1], (end - start)))
     
     return model, history, ds, predictions

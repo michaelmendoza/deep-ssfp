@@ -1,16 +1,28 @@
 import os.path
 import numpy as np
 import matplotlib.pyplot as plt
-from deepssfp import dataloader, dataformatter
+from deepssfp import dataloader, dataformatter, recon
 
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'SuperFOV']
+# 'SyntheticBanding:1_3->2_4': 'SyntheticBanding'
+modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV']
 
 class Dataset:
 
-    def __init__(self, mode):
+    def __init__(self, mode, input_data=None, output_data=None):
+        """Initialize Dataset with either provided data or loaded data.
+            
+            Parameters
+            ----------
+            mode : str
+                One of the supported modes from modes list
+            input_data : ndarray, optional
+                Input data of shape [slices, height, width, phase_cycles]
+            output_data : ndarray, optional
+                Output/target data of shape [slices, height, width, channels]
+        """
 
         self.mode = mode
-        self.x, self.y = self.load_data()
+        self.x, self.y = self.load_data(input_data, output_data)
 
         self.SIZE = self.x.shape[0]
         self.HEIGHT = self.x.shape[1]
@@ -27,10 +39,32 @@ class Dataset:
     def __repr__(self) -> str:
         return f'dataset.Dataset({self.mode})'
 
-    def load_data(self):
+    def load_data(self, input_data=None, output_data=None):
         ''' Load, format and prepare data for dataset '''
 
-        x, y = dataloader.load()
+        # Check if custom data is provided
+        if input_data is not None:
+            x = input_data
+
+            if output_data is None:
+                y = [] 
+                for slice in range(x.shape[0]):
+                    y.append(recon.gs_recon(x[slice,:,:,:], pc_axis=2))
+                y = np.stack(y, axis = 0)
+            else:
+                y = output_data
+
+            # Validate input shapes
+            if len(input_data.shape) != 4:
+                raise ValueError(f"input_data must be 4D [slices, height, width, phase_cycles], got shape {input_data.shape}")
+            if len(output_data.shape) != 4:
+                raise ValueError(f"output_data must be 4D [slices, height, width, channels], got shape {output_data.shape}")
+            
+        else:
+            # Load default data if no custom data provided
+            x, y = dataloader.load()
+
+        #x, y = dataloader.load()
         x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
         return x, y
 

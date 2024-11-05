@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from deepssfp import recon
 
-data_folderpath = '../../data/2017_DeepSSFP/11062017_SSFP_Smoothing_DL_Phantom'
+data_folderpath = '../../../data/2017_DeepSSFP/11062017_SSFP_Smoothing_DL_Phantom'
 cache_filename = 'deep_ssfp_phantom_dataset_cache'
 
 def load():
@@ -65,7 +65,7 @@ def load_data_and_prepare(files):
     # Load data from file
     M = []
     for file in files:
-        data = read_rawdata(file, is3D=True, doChaAverage = True, doAveAverage = True)
+        data = read_rawdata(file, doChaAverage = True, doAveAverage = True)
         M.append(data['data'])
     
     # Prepare data 

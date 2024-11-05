@@ -1,7 +1,13 @@
-
-*.npy
-*.mp4
-
+# Python-related files
 *.pyc
 __pycache__/
 .ipynb_checkpoints/
+
+# Data files
+*.npy
+*.mp4
+*.mnc
+
+# Model/data folders
+data/
+saved_models/

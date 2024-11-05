@@ -1,19 +1,19 @@
 import numpy as np
 
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding:1_3->2_4', 'SuperFOV']
+modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV']
 
 def format_and_prepare_data(x, y, mode):
     ''' Formats and prepares data for deepssfp experiments:
         1) BandRemoval:4 - Transforms complex data into real/img components
         2) BandRemoval:2 - Takes a subset of x data and transforms complex data into real/img components
-        3) SyntheticBanding:1_3->2_4 - Takes alternating subsets of data and transforms complex data into real/img components
+        3) SyntheticBanding - Takes alternating subsets of data and transforms complex data into real/img components
         4) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
     '''
     if mode == 'BandRemoval:4':
         pass
     elif mode == 'BandRemoval:2':
         x = x[:,:,:,::2]
-    elif mode == 'SyntheticBanding:1_3->2_4':
+    elif mode == 'SyntheticBanding':
         y = x[:,:,:,1::2]
         x = x[:,:,:,::2]
     elif mode == 'SuperFOV':
