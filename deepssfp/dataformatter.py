@@ -55,3 +55,12 @@ def complex_to_real_img(x):
         _x[:,:,:,2*n] = x[:,:,:,n].real
         _x[:,:,:,2*n+1] = x[:,:,:,n].imag
     return _x
+
+def real_imag_to_complex(x):
+    ''' Converts real and imaginary dims for a tensor with a complex dim to a complex tensor '''
+
+    s = x.shape
+    out = np.zeros((s[0], s[1], s[2], s[3] // 2))
+    for ii in range(s[3] // 2):
+        out[:,:,:,ii] = x[:,:,:,2*ii] + 1j * x[:,:,:,2*ii+1]
+    return out

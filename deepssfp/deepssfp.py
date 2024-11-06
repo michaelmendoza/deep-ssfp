@@ -125,3 +125,53 @@ def train(mode=dataset.modes[0], epochs=200, model_dir='saved_models',
     print('Summary: Loss: %.2f Time Elapsed: %.2f seconds' % (evaluation[1], (end - start)))
     
     return model, history, ds, predictions
+
+
+def load_model(mode=dataset.modes[0], model_dir='saved_models', data_shape=None):
+    """Load a trained DeepSSFP model for inference.
+    
+    Parameters
+    ----------
+    mode : str
+        Model mode from dataset.modes
+    model_dir : str
+        Directory where model weights are saved
+    custom_shape : tuple, optional
+        Custom shape tuple (HEIGHT, WIDTH, CHANNELS_IN, CHANNELS_OUT) 
+        If None, uses default shape from Dataset class
+        
+    Returns
+    -------
+    model : tf.keras.Model
+        Loaded model ready for inference
+    """
+    # Generate the model name based on the mode
+    model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
+    model_path = os.path.join(model_dir, model_name)
+    
+    # Check if model exists
+    if not os.path.exists(f"{model_path}.index"):
+        raise FileNotFoundError(f"No saved model found at {model_path}")
+    
+    # Get model parameters either from custom_shape or dataset
+    if data_shape is not None:
+        HEIGHT, WIDTH, CHANNELS_IN, CHANNELS_OUT = data_shape
+    else:
+        # Create dummy dataset to get shapes
+        ds = dataset.Dataset(mode)
+        HEIGHT = ds.HEIGHT
+        WIDTH = ds.WIDTH
+        CHANNELS_IN = ds.CHANNELS_IN
+        CHANNELS_OUT = ds.CHANNELS_OUT
+    
+    # Create and compile model
+    model = models.unet_model(HEIGHT, WIDTH, CHANNELS_IN, CHANNELS_OUT)
+    model.compile(optimizer='adam', 
+                 loss=tf.keras.losses.MeanSquaredError(), 
+                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
+    
+    # Load weights
+    print(f"Loading model weights from {model_path}")
+    model.load_weights(model_path)
+    
+    return model

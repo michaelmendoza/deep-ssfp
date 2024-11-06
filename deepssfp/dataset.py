@@ -46,7 +46,7 @@ class Dataset:
         if input_data is not None:
             x = input_data
 
-            if output_data is None:
+            if output_data is None and self.mode != 'SyntheticBanding':
                 y = [] 
                 for slice in range(x.shape[0]):
                     y.append(recon.gs_recon(x[slice,:,:,:], pc_axis=2))
@@ -54,18 +54,14 @@ class Dataset:
             else:
                 y = output_data
 
-            # Validate input shapes
-            if len(input_data.shape) != 4:
-                raise ValueError(f"input_data must be 4D [slices, height, width, phase_cycles], got shape {input_data.shape}")
-            if len(output_data.shape) != 4:
-                raise ValueError(f"output_data must be 4D [slices, height, width, channels], got shape {output_data.shape}")
-            
         else:
             # Load default data if no custom data provided
             x, y = dataloader.load()
 
-        #x, y = dataloader.load()
+        #print(f'X: {x.shape}')
         x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
+        #print(f'X: {x.shape} Y: {y.shape}')
+
         return x, y
 
     def generate(self):
@@ -78,8 +74,10 @@ class Dataset:
         self.output = self.y[indices]
 
         # Setup data
-        self.input, input_mean, input_std = self.StandardScaler(self.input)
-        self.output, output_mean, output_std = self.StandardScaler(self.output)
+        self.inputScaler = StandardScaler(self.input)
+        self.outputScaler = StandardScaler(self.output)
+        self.input = self.inputScaler.transform(self.input)
+        self.output = self.outputScaler.transform(self.output)
 
         # Split data into test/training sets
         index = int(self.ratio * len(self.input)) # Split index
@@ -94,20 +92,6 @@ class Dataset:
         indices = np.random.randint(0, length, batch_size)
         return [self.input[indices], self.output[indices]]
 
-    def StandardScaler(self, data):
-        ''' Scales data using mean/std statistics '''
-        mean = np.mean(data)
-        std = np.std(data)
-        return (data - mean) / std, mean, std
-
-    def MinMaxScalerByImage(self, data):
-        s = data.shape
-        data = np.reshape(data, (s[0], s[1] * s[2] * s[3]))
-        data = np.swapaxes(data, 0, 1) / (np.max(data, axis=1) - np.min(data, axis=1))
-        data = np.swapaxes(data, 0, 1)
-        data = np.reshape(data, (s[0], s[1], s[2], s[3]))
-        return data
-
     def plot(self):
         pass
 
@@ -121,3 +105,28 @@ class Dataset:
 
         axs[0].hist(dist1, bins=n_bins)
         axs[1].hist(dist2, bins=n_bins)
+
+    def transform(self, data, type='input'):
+        ''' Transforms data using datset settings. It formats and scales the data. 
+            For input: It will format data, then scale. For output: It will inverse scale, then format to complex data '''
+
+        if type == 'input':
+            x, y = self.load_data(data)
+            return self.inputScaler.transform(x)
+        elif type == 'output':
+            y = self.inputScaler.inverse_transform(data)
+            y = dataformatter.real_imag_to_complex(y)
+            return y
+        
+class StandardScaler:
+    def __init__(self, data):
+        self.mean = np.mean(data)
+        self.std = np.std(data)
+    
+    def transform(self, data):
+        ''' Transforms data using mean/std statistics '''
+        return (data - self.mean) / self.std
+
+    def inverse_transform(self, data):
+        ''' Transforms data using mean/std statistics '''
+        return data * self.std + self.mean
