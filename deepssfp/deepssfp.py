@@ -5,10 +5,11 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from pathlib import Path
 from deepssfp import dataset, models
 
-def train(mode=dataset.modes[0], epochs=200, model_dir='saved_models', 
-          continue_training=False, input_data=None, output_data=None):
+def train(mode=dataset.modes[0], epochs=200, model_path=None, model_dir='saved_models', 
+          continue_training=False, input_data=None, output_data=None, dataset=None):
     """Train the DeepSSFP model with support for saving and loading weights.
     
     Parameters
@@ -33,14 +34,21 @@ def train(mode=dataset.modes[0], epochs=200, model_dir='saved_models',
     validation_split = 0.2
     shuffle = True
 
-    # Create model directory if it doesn't exist
-    os.makedirs(model_dir, exist_ok=True)
+    if model_path is None:
+        # Create model directory if it doesn't exist
+        os.makedirs(model_dir, exist_ok=True)
+        
+        # Generate a model name based on the mode and parameters
+        model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
+        model_path = os.path.join(model_dir, model_name)
+    else:
+        path = model_path.split(os.sep)
+        model_path = Path(os.path.join(*path))
     
-    # Generate a model name based on the mode and parameters
-    model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
-    model_path = os.path.join(model_dir, model_name)
-
-    ds = dataset.Dataset(mode, input_data, output_data)
+    if dataset is None:
+        ds = dataset.Dataset(mode, input_data, output_data)
+    else:
+        ds = dataset
 
     x_train = ds.x_train
     y_train = ds.y_train
