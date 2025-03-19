@@ -1,10 +1,17 @@
 import os.path
 import numpy as np
 import matplotlib.pyplot as plt
+from enum import Enum
 from deepssfp import dataloader, dataformatter, recon
 
 # 'SyntheticBanding:1_3->2_4': 'SyntheticBanding'
 modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV']
+
+class DataMode(Enum):
+    BandRemoval4 = 'BandRemoval:4'
+    BandRemoval2 = 'BandRemoval:2'
+    SyntheticBanding = 'SyntheticBanding'
+    SuperFOV = 'SuperFOV'
 
 class Dataset:
 

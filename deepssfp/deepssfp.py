@@ -1,16 +1,164 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 import time
+import logging
+from typing import Tuple, Dict, Optional, Union, List
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from pathlib import Path
-from deepssfp import dataset, models
+from tensorflow.keras.callbacks import (
+    ModelCheckpoint, 
+    EarlyStopping, 
+    ReduceLROnPlateau, 
+    TensorBoard, 
+    Callback
+)
 
-def train(mode=dataset.modes[0], epochs=200, model_path=None, model_dir='saved_models', 
-          continue_training=False, input_data=None, output_data=None, dataset=None):
-    """Train the DeepSSFP model with support for saving and loading weights.
+import deepssfp
+from deepssfp import dataset, models
+from .dataset import Dataset
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('DeepSSFP')
+
+# Set TensorFlow log level
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
+
+
+class HistorySaver(Callback):
+    """Custom callback to save training history after each epoch."""
+    
+    def __init__(self, history_dict: Dict[str, List], save_path: str):
+        """Initialize the callback.
+        
+        Parameters
+        ----------
+        history_dict : Dict[str, List]
+            Dictionary to store history values
+        save_path : str
+            Path to save the history
+        """
+        super().__init__()
+        self.history_dict = history_dict
+        self.save_path = save_path
+        
+    def on_epoch_end(self, epoch, logs=None):
+        """Save history at the end of each epoch."""
+        logs = logs or {}
+        for key in self.history_dict.keys():
+            if key in logs:
+                self.history_dict[key].append(logs[key])
+        
+        # Save history to disk
+        np.savez(self.save_path, **self.history_dict)
+
+
+def create_callbacks(
+    model_path: str,
+    history_dict: Dict[str, List],
+    patience: int = 20,
+    min_delta: float = 0.001,
+    use_early_stopping: bool = True,
+    use_reduce_lr: bool = True,
+    use_tensorboard: bool = True
+) -> List[Callback]:
+    """Create a list of callbacks for model training.
+    
+    Parameters
+    ----------
+    model_path : str
+        Path to save the model (without extension)
+    history_dict : Dict[str, List]
+        Dictionary to store history values
+    patience : int
+        Patience for early stopping and learning rate reduction
+    min_delta : float
+        Minimum change to qualify as improvement
+    use_early_stopping : bool
+        Whether to use early stopping
+    use_reduce_lr : bool
+        Whether to use learning rate reduction
+    use_tensorboard : bool
+        Whether to use TensorBoard logging
+        
+    Returns
+    -------
+    List[Callback]
+        List of Keras callbacks
+    """
+    callbacks = []
+    
+    # Model checkpoint to save best model
+    keras_model_path = f"{model_path}.keras"
+    callbacks.append(ModelCheckpoint(
+        keras_model_path,
+        save_best_only=True,
+        monitor='val_loss',
+        mode='min',
+        verbose=1
+    ))
+    
+    # History saver
+    history_path = f"{model_path}_history.npz"
+    callbacks.append(HistorySaver(history_dict, history_path))
+    
+    # Early stopping
+    if use_early_stopping:
+        callbacks.append(EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            min_delta=min_delta,
+            verbose=1,
+            restore_best_weights=True
+        ))
+    
+    # Reduce learning rate on plateau
+    if use_reduce_lr:
+        callbacks.append(ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=patience // 2,
+            min_delta=min_delta,
+            verbose=1,
+            min_lr=1e-6
+        ))
+    
+    # TensorBoard logging
+    if use_tensorboard:
+        log_dir = f"{model_path}_logs"
+        callbacks.append(TensorBoard(
+            log_dir=log_dir,
+            histogram_freq=1,
+            write_graph=True,
+            update_freq='epoch'
+        ))
+    
+    return callbacks
+
+
+def train(
+    mode: str = dataset.modes[0],
+    epochs: int = 200,
+    model_name: str = "deepssfp",
+    model_dir: str = 'saved_models',
+    continue_training: bool = False,
+    input_data: Optional[np.ndarray] = None,
+    output_data: Optional[np.ndarray] = None,
+    custom_dataset: Optional[Dataset] = None,
+    batch_size: int = 16,
+    validation_batch_size: int = 8,
+    steps_per_epoch: int = 20,
+    validation_steps: int = 10,
+    use_early_stopping: bool = True,
+    patience: int = 20,
+    use_tensorboard: bool = True
+) -> Tuple[tf.keras.Model, tf.keras.callbacks.History, Dataset, np.ndarray]:
+    """Train the DeepSSFP model with support for saving and loading with .keras format.
     
     Parameters
     ----------
@@ -18,51 +166,76 @@ def train(mode=dataset.modes[0], epochs=200, model_path=None, model_dir='saved_m
         Training mode from dataset.modes
     epochs : int
         Number of epochs to train
+    model_name : str
+        Base name for the model (will be combined with mode)
     model_dir : str
         Directory to save/load model weights
     continue_training : bool
         If True, load existing weights when available
-    input_data : ndarray, optional
+    input_data : np.ndarray, optional
         Custom input data of shape [slices, height, width, phase_cycles]
-    output_data : ndarray, optional
+    output_data : np.ndarray, optional
         Custom output/target data of shape [slices, height, width, channels]
-    """
-    
-    # Training Parameters
-    batch_size = 16
-    test_batch_size = 8
-    validation_split = 0.2
-    shuffle = True
-
-    if model_path is None:
-        # Create model directory if it doesn't exist
-        os.makedirs(model_dir, exist_ok=True)
+    custom_dataset : Dataset, optional
+        Dataset object to use instead of creating a new one
+    batch_size : int
+        Batch size for training
+    validation_batch_size : int
+        Batch size for validation
+    steps_per_epoch : int
+        Number of steps (batches) per epoch
+    validation_steps : int
+        Number of validation steps per epoch
+    use_early_stopping : bool
+        Whether to use early stopping
+    patience : int
+        Patience for early stopping and learning rate reduction
+    use_tensorboard : bool
+        Whether to use TensorBoard logging
         
-        # Generate a model name based on the mode and parameters
-        model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
-        model_path = os.path.join(model_dir, model_name)
-    else:
-        path = model_path.split(os.sep)
-        model_path = Path(os.path.join(*path))
+    Returns
+    -------
+    model : tf.keras.Model
+        Trained model
+    history : tf.keras.callbacks.History
+        Training history
+    ds : Dataset
+        Dataset used for training
+    predictions : np.ndarray
+        Predictions on test data
+    """
+    # Create model directory if it doesn't exist
+    os.makedirs(model_dir, exist_ok=True)
     
-    if dataset is None:
-        ds = dataset.Dataset(mode, input_data, output_data)
+    # Generate model path based on model_name and mode
+    mode_str = mode.lower().replace(':', '_')
+    model_path = os.path.join(model_dir, f"{model_name}_{mode_str}")
+    logger.info(f"Model will be saved to: {model_path}")
+    
+    # Define paths for model and history
+    keras_model_path = f"{model_path}.keras"
+    history_path = f"{model_path}_history.npz"
+    
+    # Prepare dataset
+    if custom_dataset is not None:
+        ds = custom_dataset
     else:
-        ds = dataset
+        ds = Dataset(mode, input_data, output_data)
 
     x_train = ds.x_train
     y_train = ds.y_train
     x_test = ds.x_test
     y_test = ds.y_test
 
-    print("Training DataSet: " + str(x_train.shape) + " " + str(y_train.shape))
-    print("Test DataSet: " + str(x_test.shape) + " " + str(y_test.shape))
+    logger.info(f"Training DataSet: {x_train.shape} | {y_train.shape}")
+    logger.info(f"Test DataSet: {x_test.shape} | {y_test.shape}")
 
-    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size).shuffle(50)
-    train_dataset = train_dataset.repeat()
+    # Create TensorFlow datasets
+    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    train_dataset = train_dataset.batch(batch_size).shuffle(50).repeat()
 
-    valid_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(test_batch_size).shuffle(50)
-    valid_dataset = valid_dataset.repeat()
+    valid_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+    valid_dataset = valid_dataset.batch(validation_batch_size).shuffle(50).repeat()
 
     # Network Parameters
     WIDTH = ds.WIDTH
@@ -70,78 +243,137 @@ def train(mode=dataset.modes[0], epochs=200, model_path=None, model_dir='saved_m
     CHANNELS = ds.CHANNELS_IN
     NUM_OUTPUTS = ds.CHANNELS_OUT
 
-    # Create model
-    model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
-    print(f'DL Model: {HEIGHT}, {WIDTH}, {CHANNELS}, {NUM_OUTPUTS}')
-
-    model.compile(optimizer='adam', 
-                 loss=tf.keras.losses.MeanSquaredError(), 
-                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
-    
-    # Load weights if continuing training and weights exist
+    # Initialize history tracking
     initial_epoch = 0
-    if continue_training and os.path.exists(f"{model_path}.index"):
-        print(f"Loading existing model weights from {model_path}")
-        model.load_weights(model_path)
+    history_dict = {
+        'loss': [],
+        'val_loss': [],
+        'mean_absolute_error': [],
+        'val_mean_absolute_error': [],
+        'lr': []
+    }
+    
+    # Load existing model or create new one
+    if continue_training and os.path.exists(keras_model_path):
+        logger.info(f"Loading existing model from {keras_model_path}")
+        model = tf.keras.models.load_model(keras_model_path)
         
         # Load training history if it exists
-        history_path = f"{model_path}_history.npy"
         if os.path.exists(history_path):
-            print("Loading training history")
-            history_dict = np.load(history_path, allow_pickle=True).item()
+            logger.info(f"Loading training history from {history_path}")
+            history_data = np.load(history_path)
+            for key in history_dict.keys():
+                if key in history_data:
+                    history_dict[key] = history_data[key].tolist()
+            
             initial_epoch = len(history_dict['loss'])
-            print(f"Continuing training from epoch {initial_epoch}")
-    
+            logger.info(f"Continuing training from epoch {initial_epoch}")
+    else:
+        # Create new model
+        logger.info(f"Creating new model with dimensions: {HEIGHT}x{WIDTH}x{CHANNELS}→{NUM_OUTPUTS}")
+        model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            loss=tf.keras.losses.MeanSquaredError(),
+            metrics=[tf.keras.metrics.MeanAbsoluteError()]
+        )
+
+    # Print model summary
     model.summary()
 
-    # Create ModelCheckpoint callback to save best weights
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        model_path,
-        save_weights_only=True,
-        save_best_only=True,
-        monitor='val_loss',
-        mode='min',
-        verbose=1
+    # Create callbacks
+    callbacks = create_callbacks(
+        model_path=model_path,
+        history_dict=history_dict,
+        patience=patience,
+        use_early_stopping=use_early_stopping,
+        use_tensorboard=use_tensorboard
     )
 
-    start = time.time()
-    history = model.fit(
-        train_dataset, 
-        epochs=epochs,
-        initial_epoch=initial_epoch,
-        steps_per_epoch=20,
-        validation_data=valid_dataset,
-        validation_steps=10,
-        verbose=2,
-        callbacks=[checkpoint_callback]
-    )
+    # Train the model
+    start_time = time.time()
     
-    # Save training history
-    history_dict = {
-        'loss': history.history['loss'],
-        'val_loss': history.history['val_loss'],
-        'mean_absolute_error': history.history['mean_absolute_error'],
-        'val_mean_absolute_error': history.history['val_mean_absolute_error']
-    }
-    np.save(f"{model_path}_history.npy", history_dict)
+    try:
+        history = model.fit(
+            train_dataset,
+            epochs=epochs,
+            initial_epoch=initial_epoch,
+            steps_per_epoch=steps_per_epoch,
+            validation_data=valid_dataset,
+            validation_steps=validation_steps,
+            verbose=2,
+            callbacks=callbacks
+        )
+    except KeyboardInterrupt:
+        logger.info("Training interrupted. Saving current model state...")
+        model.save(keras_model_path)
+        np.savez(history_path, **history_dict)
+        logger.info(f"Model saved to {keras_model_path}")
     
-    evaluation = model.evaluate(x_test, y_test, verbose=1)
-    predictions = model.predict(x_test)
-    end = time.time()
-
-    print("Training Complete.")
-    print('Summary: Loss: %.2f Time Elapsed: %.2f seconds' % (evaluation[1], (end - start)))
+    # Save final model if training completed
+    else:
+        # Ensure final history is saved
+        np.savez(history_path, **history_dict)
+        
+        # Save final model
+        model.save(keras_model_path)
+        logger.info(f"Final model saved to {keras_model_path}")
+    
+    # Evaluate and predict
+    try:
+        evaluation = model.evaluate(x_test, y_test, verbose=1)
+        predictions = model.predict(x_test)
+        
+        end_time = time.time()
+        training_time = end_time - start_time
+        
+        if isinstance(evaluation, list) and len(evaluation) >= 2:
+            logger.info(f"Training Complete. Loss: {evaluation[0]:.4f}, MAE: {evaluation[1]:.4f}")
+            logger.info(f"Time Elapsed: {training_time:.2f} seconds")
+        else:
+            logger.info(f"Training Complete. Loss: {evaluation:.4f}")
+            logger.info(f"Time Elapsed: {training_time:.2f} seconds")
+    
+    except Exception as e:
+        logger.error(f"Error during evaluation: {str(e)}")
+        predictions = None
     
     return model, history, ds, predictions
 
 
-def load_model(mode=dataset.modes[0], model_dir='saved_models', data_shape=None):
+def get_path(mode: str, model_name: str, model_dir: str) -> str:
+    """Get the path to a saved model.
+    
+    Parameters
+    ----------
+    mode : str
+        Model mode from dataset.modes
+    model_name : str
+        Base name for the model (will be combined with mode)
+    model_dir : str
+        Directory where model weights are saved
+        
+    Returns
+    -------
+    str
+        Path to saved model
+    """
+    return os.path.join(model_dir, f"{model_name}_{mode.lower().replace(':', '_')}")
+
+def load_model(
+    mode: str = dataset.modes[0],
+    model_name: str = "deepssfp",
+    model_dir: str = 'saved_models',
+    custom_shape: Optional[Tuple[int, int, int, int]] = None
+) -> Tuple[tf.keras.Model, Optional[Dict]]:
     """Load a trained DeepSSFP model for inference.
     
     Parameters
     ----------
     mode : str
         Model mode from dataset.modes
+    model_name : str
+        Base name for the model (will be combined with mode)
     model_dir : str
         Directory where model weights are saved
     custom_shape : tuple, optional
@@ -152,34 +384,240 @@ def load_model(mode=dataset.modes[0], model_dir='saved_models', data_shape=None)
     -------
     model : tf.keras.Model
         Loaded model ready for inference
+    history_dict : dict, optional
+        Training history if available
     """
-    # Generate the model name based on the mode
-    model_name = f"deepssfp_{mode.lower().replace(':', '_')}"
-    model_path = os.path.join(model_dir, model_name)
+    # Generate the model path based on model_name and mode
+    mode_str = mode.lower().replace(':', '_')
+    model_path = os.path.join(model_dir, f"{model_name}_{mode_str}")
+    logger.info(f"Loading model from path: {model_path}")
+    
+    # Define paths for model and history
+    keras_model_path = f"{model_path}.keras"
+    history_path = f"{model_path}_history.npz"
     
     # Check if model exists
-    if not os.path.exists(f"{model_path}.index"):
-        raise FileNotFoundError(f"No saved model found at {model_path}")
+    if not os.path.exists(keras_model_path):
+        raise FileNotFoundError(f"No saved model found at {keras_model_path}")
     
-    # Get model parameters either from custom_shape or dataset
-    if data_shape is not None:
-        HEIGHT, WIDTH, CHANNELS_IN, CHANNELS_OUT = data_shape
+    # Load the model
+    model = tf.keras.models.load_model(keras_model_path)
+    logger.info(f"Model loaded successfully from {keras_model_path}")
+    
+    # Load history if it exists
+    history_dict = None
+    if os.path.exists(history_path):
+        logger.info(f"Loading training history from {history_path}")
+        history_data = np.load(history_path)
+        history_dict = {}
+        for key in history_data.files:
+            history_dict[key] = history_data[key].tolist()
+    
+    return model, history_dict
+
+
+def predict(
+    model: tf.keras.Model,
+    input_data: np.ndarray,
+    batch_size: int = 16
+) -> np.ndarray:
+    """Make predictions using a trained model.
+    
+    Parameters
+    ----------
+    model : tf.keras.Model
+        Trained DeepSSFP model
+    input_data : np.ndarray
+        Input data to make predictions on
+    batch_size : int
+        Batch size for prediction
+        
+    Returns
+    -------
+    np.ndarray
+        Model predictions
+    """
+    logger.info(f"Making predictions on data with shape {input_data.shape}")
+    predictions = model.predict(input_data, batch_size=batch_size)
+    logger.info(f"Predictions complete. Output shape: {predictions.shape}")
+    return predictions
+
+
+def plot_training_history(
+    history_dict: Dict,
+    title: str = "Training History",
+    figsize: Tuple[int, int] = (15, 5),
+    save_path: Optional[str] = None
+):
+    """Plot the training history from a history dictionary.
+    
+    Parameters
+    ----------
+    history_dict : Dict
+        Dictionary containing training history
+    title : str
+        Plot title
+    figsize : Tuple[int, int]
+        Figure size
+    save_path : str, optional
+        Path to save the plot
+    """
+    if not history_dict:
+        logger.warning("No history data to plot")
+        return
+    
+    if 'lr' in history_dict and history_dict['lr']:
+        fig, axs = plt.subplots(1, 3, figsize=figsize)
     else:
-        # Create dummy dataset to get shapes
-        ds = dataset.Dataset(mode)
-        HEIGHT = ds.HEIGHT
-        WIDTH = ds.WIDTH
-        CHANNELS_IN = ds.CHANNELS_IN
-        CHANNELS_OUT = ds.CHANNELS_OUT
+        fig, axs = plt.subplots(1, 2, figsize=figsize)
+
+    # Plot loss
+    axs[0].semilogy(history_dict['loss'], label='Training Loss')
+    axs[0].semilogy(history_dict['val_loss'], label='Validation Loss')
+    axs[0].set_title('Loss')
+    axs[0].set_xlabel('Epoch')
+    axs[0].set_ylabel('Log Loss')
+    axs[0].legend()
     
-    # Create and compile model
-    model = models.unet_model(HEIGHT, WIDTH, CHANNELS_IN, CHANNELS_OUT)
-    model.compile(optimizer='adam', 
-                 loss=tf.keras.losses.MeanSquaredError(), 
-                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
+    # Plot MAE
+    axs[1].semilogy(history_dict['mean_absolute_error'], label='Training MAE')
+    axs[1].semilogy(history_dict['val_mean_absolute_error'], label='Validation MAE')
+    axs[1].set_title('Mean Absolute Error')
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_ylabel('Log MAE')
+    axs[1].legend()
     
-    # Load weights
-    print(f"Loading model weights from {model_path}")
-    model.load_weights(model_path)
+    # Plot learning rate if available
+    if 'lr' in history_dict and history_dict['lr']:
+        axs[2].semilogy(history_dict['lr'], label='Learning Rate')
+        axs[2].set_title('Learning Rate')
+        axs[2].set_xlabel('Epoch')
+        axs[2].set_ylabel('Learning Rate')
+        axs[2].legend()
     
-    return model
+    plt.suptitle(title)
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Training history plot saved to {save_path}")
+    
+    plt.show()
+
+def visualize_images(
+    input_images: np.ndarray,
+    target_images: np.ndarray,
+    predicted_images: Optional[np.ndarray] = None,
+    indices: Optional[List[int]] = None,
+    num_samples: int = 3,
+    figsize: Optional[Tuple[int, int]] = None,
+    save_path: Optional[str] = None,
+    do_fft: bool = False
+):
+    """Visualize input images, target images, and optionally predicted images.
+    
+    Parameters
+    ----------
+    input_images : np.ndarray
+        Input images (x_test)
+    target_images : np.ndarray
+        Target images (y_test)
+    predicted_images : np.ndarray, optional
+        Predicted images, if None only inputs and targets are shown
+    indices : List[int], optional
+        Specific indices to visualize
+    num_samples : int
+        Number of samples to visualize if indices is None
+    figsize : Tuple[int, int], optional
+        Figure size (calculated automatically if None)
+    save_path : str, optional
+        Path to save the visualization
+    """
+    # Get image indices to visualize
+    if indices is None:
+        # Randomly select indices
+        indices = np.random.choice(
+            range(len(input_images)), 
+            size=min(num_samples, len(input_images)), 
+            replace=False
+        )
+    
+    # Determine the number of input phase cycles
+    num_input_channels = input_images.shape[-1]
+    num_input_images = num_input_channels // 2  # Assuming each image has real & imaginary parts
+    
+    # Determine if we're showing predictions too
+    show_predictions = predicted_images is not None
+    
+    # Calculate how many columns we need
+    num_cols = num_input_images + 1  # All inputs + target
+    if show_predictions:
+        num_cols += 1  # Add prediction column
+    
+    num_samples = len(indices)
+    
+    # Calculate figure size if not provided
+    if figsize is None:
+        figsize = (num_cols * 4, num_samples * 4)
+    
+    # Create figure and axes grid
+    fig, axs = plt.subplots(num_samples, num_cols, figsize=figsize)
+    
+    # Handle case of a single sample or single column
+    if num_samples == 1 and num_cols == 1:
+        axs = np.array([[axs]])
+    elif num_samples == 1:
+        axs = axs.reshape(1, -1)
+    elif num_cols == 1:
+        axs = axs.reshape(-1, 1)
+    
+    # For each selected index
+    for i, idx in enumerate(indices):
+        # Current column index
+        col_idx = 0
+        
+        # Display all input images
+        for j in range(num_input_images):
+            # Extract real and imaginary parts for this input image
+            real_idx = j * 2
+            imag_idx = j * 2 + 1
+            
+            if real_idx < num_input_channels and imag_idx < num_input_channels:
+                # Create complex image from the channel pair
+                in_img = input_images[idx, ..., real_idx] + 1j * input_images[idx, ..., imag_idx]
+                
+                # Do FFT
+                if(do_fft):
+                    in_img = np.fft.ifft2(np.fft.fftshift(in_img))
+
+                # Display the image
+                axs[i, col_idx].imshow(np.abs(in_img), cmap='gray')
+                axs[i, col_idx].set_title(f'Input {j+1}')
+                axs[i, col_idx].axis('off')
+                col_idx += 1
+        
+        # Display target image
+        target_img = deepssfp.from_pairs_to_complex(target_images[idx])
+        if(do_fft):
+            target_img = np.fft.ifft2(np.fft.fftshift(target_img))
+        axs[i, col_idx].imshow(np.abs(target_img), cmap='gray')
+        axs[i, col_idx].set_title('Target')
+        axs[i, col_idx].axis('off')
+        col_idx += 1
+        
+        # Display prediction if available
+        if show_predictions:
+            pred_img = deepssfp.from_pairs_to_complex(predicted_images[idx])
+            if(do_fft):
+                pred_img = np.fft.ifft2(np.fft.fftshift(pred_img))    
+            axs[i, col_idx].imshow(np.abs(pred_img), cmap='gray')
+            axs[i, col_idx].set_title('Prediction')
+            axs[i, col_idx].axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Image visualization saved to {save_path}")
+    
+    plt.show()
