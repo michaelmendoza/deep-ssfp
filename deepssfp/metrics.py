@@ -1,8 +1,9 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Optional
 
-def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=(8, 3)):
+def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=(8, 3), save_path:Optional[str] = None):
     """
     Evaluate band reduction using segmentation masks and plot comparison 
     of target vs prediction for each segmentation ID.
@@ -19,6 +20,8 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
         Whether to sort values in scatter plots (default: True)
     fig_size : tuple, optional
         Size of each subplot (width, height) in inches
+    save_path : str, optional
+        Path to save the plot
         
     Returns
     -------
@@ -263,6 +266,10 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
         axs[row, col].axis('off')
     
     plt.tight_layout()
+    if save_path:
+        plt.savefig(f"{save_path}_compare_by_id.png", dpi=300, bbox_inches='tight')
+        print(f"Training history plot saved to {save_path}_scatter")
+
     plt.show()
     
     # Only create the comparison plot if we have valid data
@@ -310,6 +317,11 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
     plt.ylabel('Prediction Magnitude')
     plt.legend(fontsize='small')
     plt.grid(True)
+
+    if save_path:
+        plt.savefig(f"{save_path}_compare_all.png", dpi=300, bbox_inches='tight')
+        print(f"Training history plot saved to {save_path}")
+
     plt.show()
     
     # Print metrics summary
