@@ -5,6 +5,18 @@ Taken and adapted from: https://github.com/mckib2/ssfp/blob/master/ssfp/gs_recon
 
 import numpy as np
 from skimage.util.shape import view_as_windows
+import deepssfp
+
+def gs_recon_3d(data):
+    ''' Reconstruct 3D GS from 3D complex data. Assuming data of shape [slices, height, width, pcs]'''
+    if (data.dtype == float):
+        data = deepssfp.from_pairs_to_complex(data)
+
+    s = data.shape
+    gs = np.zeros((s[:3]), dtype=complex)
+    for i in range(s[0]):
+        gs[i, ...] = gs_recon(data[i, ...], pc_axis=2)
+    return gs
 
 def gs_recon(
         Is, pc_axis=0, isophase=np.pi, second_pass=True,

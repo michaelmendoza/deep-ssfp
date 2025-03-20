@@ -1,6 +1,8 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Tuple, Dict, Optional, Union, List
+import deepssfp
 
 def plot_model_history(history):
     ''' Plot Loss History ''' 
@@ -11,34 +13,100 @@ def plot_model_history(history):
     plt.legend(["Train Accuracy", "Test Accuracy"], loc="upper left")
     plt.show()
 
-def plot_model_results(index, x, y, predict, kspace=False):
-    ''' Plot model results. Plots input, output and prediction image in a row of images. '''
-    sx = x.shape
-    sy = y.shape
-    sp = predict.shape
+def is_float(x):
+    return x.dtype == float or x.dtype == np.float32 or x.dtype == np.float64
 
+def visualize_images(
+        index : Optional[List[int]] = None,
+        input_images: Optional[np.ndarray] = None, 
+        target_images: Optional[np.ndarray] = None, 
+        predicted_images: Optional[np.ndarray] = None, 
+        num_samples: int = 1,
+        kspace: bool = False, 
+        figsize: Optional[Tuple[int, int]] = None,
+        save_path: Optional[str] = None):
+    
+    ''' Visualize input images, Plots input, target and predicted image in a row of images. '''
+
+    # Convert complex data to real/imag pairs
+    if (input_images is not None and not is_float(input_images)):
+        input_images = deepssfp.from_complex_to_pairs(input_images)
+    if (target_images is not None and not is_float(target_images)):
+        target_images = deepssfp.from_complex_to_pairs(target_images)
+    if (predicted_images is not None and not is_float(predicted_images)):
+        predicted_images = deepssfp.from_complex_to_pairs(predicted_images)
+
+    # Get shapes
+    Nimages = input_images.shape[0] if input_images is not None else target_images.shape[0] if target_images is not None else predicted_images.shape[0] if predicted_images is not None else 0
+    Ninput = input_images.shape[-1] // 2 if input_images is not None else 0
+    Ntarget = target_images.shape[-1] // 2 if target_images is not None else 0
+    Npredict = predicted_images.shape[-1] // 2 if predicted_images is not None else 0
+    num_cols = math.floor(Ninput) + math.floor(Ntarget) + math.floor(Npredict)
+
+    # Get image indices to visualize
+    if isinstance(index, int):
+        index = [index]
+    elif index is None:
+        # Randomly select indices
+        index = np.random.choice(range(Nimages), size=min(num_samples, Nimages), replace=False)
+        print(f"Selected indices: {index}")
+
+    num_samples = len(index) if index is not None else num_samples
+
+    # Calculate figure size
+    if figsize is None:
+        figsize = (num_cols * 2, num_samples * 2)
+    else:
+        figsize = (num_cols * figsize[0], num_samples * figsize[1])
+    print(f"Figure size: {figsize}")
+
+    # Convert to k-space (using ifft)
     if(kspace):
-        x = np.fft.ifft2(np.fft.fftshift(x, axes=(1,2)), axes=(1,2))
-        y = np.fft.ifft2(np.fft.fftshift(y, axes=(1,2)), axes=(1,2))
-        predict = np.fft.ifft2(np.fft.fftshift(predict, axes=(1,2)), axes=(1,2))
+        if (input_images is not None):
+            input_images = np.fft.ifft2(np.fft.fftshift(input_images, axes=(1,2)), axes=(1,2))
+        if (target_images is not None):
+            target_images = np.fft.ifft2(np.fft.fftshift(target_images, axes=(1,2)), axes=(1,2))
+        if (predicted_images is not None):
+            predicted_images = np.fft.ifft2(np.fft.fftshift(predicted_images, axes=(1,2)), axes=(1,2))
 
-    num_fig = math.floor(sx[3] / 2) + math.floor(sy[3] / 2) + math.floor(sp[3] / 2)
-    fig, axs = plt.subplots(1, num_fig, sharey=True, tight_layout=True, figsize=(15, 15))
-    count = 0
+    fig, axs = plt.subplots(num_samples, num_cols, sharey=True, tight_layout=True, figsize=figsize)
 
-    for ii in range(math.floor(sx[3] / 2)):
-        v = x[index,:,:,2*ii] + 1j * x[index,:,:,2*ii+1]
-        axs[count].imshow(np.abs(v), cmap='gray')
-        count = count + 1
+    # Handle case of a single sample or single column
+    if num_samples == 1 and num_cols == 1:
+        axs = np.array([[axs]])
+    elif num_samples == 1:
+        axs = axs.reshape(1, -1)
+    elif num_cols == 1:
+        axs = axs.reshape(-1, 1)
 
-    for ii in range(math.floor(sy[3] / 2)):
-        v = y[index,:,:,2*ii] + 1j * y[index,:,:,2*ii+1]
-        axs[count].imshow(np.abs(v), cmap='gray')
-        count = count + 1
+    for row, idx in enumerate(index):
+        count = 0
+        if (input_images is not None):
+            for ii in range(Ninput):
+                v = input_images[idx,:,:,2*ii] + 1j * input_images[idx,:,:,2*ii+1]
+                axs[row, count].imshow(np.abs(v), cmap='gray')
+                axs[row, count].set_title(f'Input {ii+1}')
+                axs[row, count].axis('off')
+                count = count + 1
 
-    for ii in range(math.floor(sp[3] / 2)):
-        v = predict[index,:,:,2*ii] + 1j * predict[index,:,:,2*ii+1]
-        axs[count].imshow(np.abs(v), cmap='gray')
-        count = count + 1
+        if (target_images is not None):
+            for ii in range(Ntarget):
+                v = target_images[idx,:,:,2*ii] + 1j * target_images[idx,:,:,2*ii+1]
+                axs[row, count].imshow(np.abs(v), cmap='gray')
+                axs[row, count].set_title(f'Target {ii+1}')
+                axs[row, count].axis('off')
+                count = count + 1
+
+        if (predicted_images is not None):
+            for ii in range(Npredict):
+                v = predicted_images[idx,:,:,2*ii] + 1j * predicted_images[idx,:,:,2*ii+1]
+                axs[row, count].imshow(np.abs(v), cmap='gray')
+                axs[row, count].set_title(f'Prediction {ii+1}')
+                axs[row, count].axis('off')
+                count = count + 1
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Image visualization saved to {save_path}")
 
     plt.show()
