@@ -10,6 +10,7 @@ import deepssfp
 def gs_recon_3d(data):
     ''' Reconstruct 3D GS from 3D complex data. Assuming data of shape [slices, height, width, pcs]'''
     if (data.dtype == float):
+        print("real/imag pairs -> complex")
         data = deepssfp.from_pairs_to_complex(data)
 
     s = data.shape

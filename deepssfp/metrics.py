@@ -28,9 +28,6 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
     dict
         Dictionary of metrics by segmentation ID
     """
-    import math
-    import numpy as np
-    import matplotlib.pyplot as plt
     
     # Print shapes for debugging
     print(f"Target shape: {target.shape}")

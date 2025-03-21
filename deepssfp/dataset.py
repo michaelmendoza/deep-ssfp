@@ -80,9 +80,17 @@ class Dataset:
         self.input = self.x[indices]
         self.output = self.y[indices]
 
+        # Setup data - Use same scaler for SyntheticBanding mode
+        if self.mode == 'SyntheticBanding':
+            print('Using same scaler for SyntheticBanding mode')
+            combined_data = np.concatenate((self.input, self.output), axis=0)
+            self.inputScaler = StandardScaler(combined_data)
+            self.outputScaler = StandardScaler(combined_data)
+        else:
+            self.inputScaler = StandardScaler(self.input)
+            self.outputScaler = StandardScaler(self.output)
+
         # Setup data
-        self.inputScaler = StandardScaler(self.input)
-        self.outputScaler = StandardScaler(self.output)
         self.input = self.inputScaler.transform(self.input)
         self.output = self.outputScaler.transform(self.output)
 
