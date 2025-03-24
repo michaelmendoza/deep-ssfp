@@ -156,7 +156,7 @@ def train(
     validation_steps: int = 10,
     use_early_stopping: bool = True,
     patience: int = 20,
-    use_tensorboard: bool = True
+    use_tensorboard: bool = False
 ) -> Tuple[tf.keras.Model, tf.keras.callbacks.History, Dataset, np.ndarray]:
     """Train the DeepSSFP model with support for saving and loading with .keras format.
     
@@ -338,7 +338,7 @@ def train(
         logger.error(f"Error during evaluation: {str(e)}")
         predictions = None
     
-    return model, history, ds, predictions
+    return model, history_dict, ds, predictions
 
 
 def get_path(mode: str, model_name: str, model_dir: str) -> str:

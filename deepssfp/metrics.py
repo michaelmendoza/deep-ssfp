@@ -1,7 +1,197 @@
+"""
+Module for calculating image quality metrics for MRI reconstructions.
+"""
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional
+from skimage.metrics import structural_similarity as ssim
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import normalized_root_mse as nrmse
+
+def calculate_image_metrics(target, prediction, segment_ids=None, segmentation=None):
+    """Calculate image quality metrics between target and prediction.
+    
+    Parameters
+    ----------
+    target : np.ndarray
+        Ground truth complex data with shape (samples, height, width)
+    prediction : np.ndarray
+        Predicted complex data with shape (samples, height, width)
+    segment_ids : list, optional
+        List of segment IDs to calculate metrics for. If None, calculate for whole image.
+    segmentation : np.ndarray, optional
+        Segmentation mask with integer labels with shape (height, width)
+        
+    Returns
+    -------
+    dict
+        Dictionary of metrics including MSE, MAE, PSNR, SSIM, NRMSE
+    """
+    # Initialize metrics dictionary
+    metrics = {
+        'global': {
+            'mse': [],
+            'mae': [],
+            'psnr': [],
+            'ssim': [],
+            'nrmse': []
+        }
+    }
+    
+    # Initialize segment-specific metrics if segmentation is provided
+    if segment_ids is not None and segmentation is not None:
+        for id in segment_ids:
+            metrics[f'segment_{id}'] = {
+                'mse': [],
+                'mae': [],
+                'psnr': [],
+                'ssim': [],
+                'nrmse': []
+            }
+    
+    # Calculate metrics for each sample
+    for i in range(target.shape[0]):
+        # Get magnitude images
+        target_mag = np.abs(target[i])
+        pred_mag = np.abs(prediction[i])
+        
+        # Calculate global metrics
+        _calculate_and_add_metrics(target_mag, pred_mag, metrics['global'])
+        
+        # Calculate segment-specific metrics if segmentation is provided
+        if segment_ids is not None and segmentation is not None:
+            for id in segment_ids:
+                mask = (segmentation == id)
+                if np.sum(mask) > 0:  # Only calculate if segment has pixels
+                    _calculate_and_add_metrics(
+                        target_mag[mask], 
+                        pred_mag[mask], 
+                        metrics[f'segment_{id}']
+                    )
+    
+    # Calculate average metrics
+    avg_metrics = {}
+    for region, region_metrics in metrics.items():
+        avg_metrics[region] = {}
+        for key, values in region_metrics.items():
+            if values:  # Only calculate average if we have values
+                avg_metrics[region][key] = np.mean(values)
+            else:
+                avg_metrics[region][key] = np.nan
+    
+    return avg_metrics
+
+def _calculate_and_add_metrics(target, prediction, metrics_dict):
+    """Helper function to calculate and add metrics to a dictionary.
+    
+    Parameters
+    ----------
+    target : np.ndarray
+        Ground truth magnitude data
+    prediction : np.ndarray
+        Predicted magnitude data
+    metrics_dict : dict
+        Dictionary to add metrics to
+    """
+    # Check if we have enough data to calculate metrics
+    if target.size < 2 or prediction.size < 2:
+        # Not enough data for meaningful metrics
+        for metric in ['mse', 'mae', 'psnr', 'ssim', 'nrmse']:
+            metrics_dict[metric].append(np.nan)
+        return
+    
+    # Calculate MSE and MAE
+    mse = np.mean((target - prediction) ** 2)
+    mae = np.mean(np.abs(target - prediction))
+    
+    # Normalize images to [0, 1] range for SSIM and PSNR if needed
+    if np.max(target) > 1.0 or np.min(target) < 0.0:
+        t_min, t_max = np.min(target), np.max(target)
+        target_norm = (target - t_min) / (t_max - t_min) if t_max > t_min else target
+    else:
+        target_norm = target
+        
+    if np.max(prediction) > 1.0 or np.min(prediction) < 0.0:
+        p_min, p_max = np.min(prediction), np.max(prediction)
+        pred_norm = (prediction - p_min) / (p_max - p_min) if p_max > p_min else prediction
+    else:
+        pred_norm = prediction
+    
+    # Calculate PSNR
+    try:
+        psnr_val = psnr(target_norm, pred_norm, data_range=1.0)
+    except Exception as e:
+        print(f"Error calculating PSNR: {e}")
+        psnr_val = np.nan
+    
+    # Calculate SSIM - only for global or large enough segments
+    ssim_val = np.nan  # Default to NaN for small segments
+    try:
+        # For 1D data or very small segments, skip SSIM
+        if target_norm.ndim == 1 or (target_norm.ndim == 2 and min(target_norm.shape) < 7):
+            ssim_val = np.nan
+        # For flattened segment data, reshape to 2D if possible
+        elif target_norm.ndim == 1 or len(target_norm.shape) == 1:
+            size = int(np.sqrt(target_norm.size))
+            if size * size == target_norm.size:  # Perfect square
+                t_2d = target_norm.reshape(size, size)
+                p_2d = pred_norm.reshape(size, size)
+                # Use a small window size
+                win_size = min(7, size)
+                ssim_val = ssim(
+                    t_2d, p_2d, 
+                    data_range=1.0, 
+                    win_size=win_size,
+                    gaussian_weights=True
+                )
+            else:
+                ssim_val = np.nan
+        else:
+            # For 2D data, calculate SSIM with appropriate window size
+            win_size = min(7, min(target_norm.shape))
+            ssim_val = ssim(
+                target_norm, 
+                pred_norm, 
+                data_range=1.0, 
+                win_size=win_size,
+                gaussian_weights=True
+            )
+    except Exception as e:
+        # Suppress frequent error messages to avoid cluttering output
+        if "win_size exceeds image extent" not in str(e):
+            print(f"Error calculating SSIM: {e}")
+        ssim_val = np.nan
+    
+    # Calculate NRMSE
+    try:
+        nrmse_val = nrmse(target, prediction)
+    except Exception as e:
+        print(f"Error calculating NRMSE: {e}")
+        nrmse_val = np.nan
+    
+    # Add to metrics
+    metrics_dict['mse'].append(mse)
+    metrics_dict['mae'].append(mae)
+    metrics_dict['psnr'].append(psnr_val)
+    metrics_dict['ssim'].append(ssim_val)
+    metrics_dict['nrmse'].append(nrmse_val)
+
+def print_metrics_summary(metrics):
+    """Print a summary of the metrics.
+    
+    Parameters
+    ----------
+    metrics : dict
+        Dictionary of metrics
+    """
+    print("\n===== Image Quality Metrics =====")
+    
+    for region, region_metrics in metrics.items():
+        print(f"\n{region.upper()}:")
+        for metric, value in region_metrics.items():
+            print(f"  {metric.upper()}: {value:.6f}")
 
 def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=(8, 3), save_path:Optional[str] = None):
     """
