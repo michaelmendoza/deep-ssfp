@@ -64,6 +64,8 @@ def calculate_image_metrics(target, prediction, segment_ids=None, segmentation=N
         if segment_ids is not None and segmentation is not None:
             for id in segment_ids:
                 mask = (segmentation == id)
+                if (len(mask.shape) == 3):
+                    mask = mask[i]
                 if np.sum(mask) > 0:  # Only calculate if segment has pixels
                     _calculate_and_add_metrics(
                         target_mag[mask], 
@@ -232,8 +234,11 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
     if len(target.shape) == 3 and len(seg.shape) == 2:
         if target.shape[1:] != seg.shape:
             raise ValueError(f"Target dimensions {target.shape[1:]} and segmentation dimensions {seg.shape} must match")
+    elif len(target.shape) == 3 and len(seg.shape) == 3:
+        #seg = seg[-target.shape[0]:, ...]
+        pass
     else:
-        raise ValueError("Expected target/prediction with shape (samples, height, width) and seg with shape (height, width)")
+        raise ValueError(f"Error: Expected target/prediction with shape (samples, height, width): {target.shape} and seg with shape (height, width): {seg.shape}")
     
     # Process the first sample for visualization
     sample_idx = 0
@@ -294,12 +299,14 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
     for i in range(batch_size):
         target_i = target[i]
         prediction_i = prediction[i]
-        
+
         # First, extract noise values if ID=0 exists
         pred_noise_power = None
         target_noise_power = None
         if 0 in np.unique(seg):
             noise_mask = (seg == 0)
+            if (len(noise_mask.shape) == 3):
+                noise_mask = noise_mask[i]
             if np.sum(noise_mask) > 0:
                 # For prediction noise
                 pred_noise_values = np.abs(prediction_i[noise_mask])
@@ -311,6 +318,8 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
         
         for id in ids:
             mask = (seg == id)
+            if (len(mask.shape) == 3):
+                mask = mask[i]
             if np.sum(mask) == 0:
                 continue
                 
@@ -357,6 +366,8 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
             
         # Use first sample for visualization
         mask = (seg == id)
+        if (len(mask.shape) == 3):
+            mask = mask[i]
         target_values = np.abs(target_sample[mask])
         pred_values = np.abs(prediction_sample[mask])
         
@@ -387,6 +398,8 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
         target_snr = None
         if 0 in np.unique(seg) and id != 0:
             noise_mask = (seg == 0)
+            if (len(noise_mask.shape) == 3):
+                noise_mask = noise_mask[i]
             if np.sum(noise_mask) > 0:
                 # Calculate average prediction noise power across all samples
                 pred_noise_powers = []
@@ -473,6 +486,8 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
     # Only plot the IDs we're interested in
     for id in plot_ids:
         mask = (seg == id)
+        if (len(mask.shape) == 3):
+            mask = mask[i]
         if np.sum(mask) == 0 or id not in metrics:
             continue
             
@@ -532,3 +547,4 @@ def evaluate_band_reduction(target, prediction, seg, sort_values=True, fig_size=
         print(output)
     
     return metrics
+

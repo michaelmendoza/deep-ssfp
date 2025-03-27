@@ -54,6 +54,10 @@ class HistorySaver(Callback):
             if key in logs:
                 self.history_dict[key].append(logs[key])
         
+        lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        self.history_dict['lr'].append(lr)
+        print(f"Learning rate: {lr:.4f}")
+        
         # Save history to disk
         np.savez(self.save_path, **self.history_dict)
 
@@ -272,6 +276,8 @@ def train(
         # Create new model
         logger.info(f"Creating new model with dimensions: {HEIGHT}x{WIDTH}x{CHANNELS}→{NUM_OUTPUTS}")
         model = models.unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS)
+        logger.info(f"Model created: {model.name}")
+
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             loss=tf.keras.losses.MeanSquaredError(),

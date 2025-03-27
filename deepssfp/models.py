@@ -69,7 +69,7 @@ def unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
         x = Conv2D(filters, (3, 3), padding="same", activation=tf.nn.relu, kernel_initializer='he_normal')(x)
         x = Conv2D(filters, (3, 3), padding="same", activation=tf.nn.relu, kernel_initializer='he_normal')(x)
         x = BatchNormalization(axis=-1, momentum=0.95, epsilon=0.001)(x)
-        #x = Dropout(rate=0.0)(x)
+        x = Dropout(rate=0.1)(x)
         return x
 
     def max_pool(x):
@@ -81,7 +81,7 @@ def unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
         x = Conv2D(filters, (3, 3), padding="same", activation=tf.nn.relu, kernel_initializer='he_normal')(x)
         x = Conv2D(filters, (3, 3), padding="same", activation=tf.nn.relu, kernel_initializer='he_normal')(x)
         x = BatchNormalization(axis=-1, momentum=0.95, epsilon=0.001)(x)
-        #x = Dropout(rate=0.0)(x)
+        x = Dropout(rate=0.1)(x)
         return x 
 
     def unet():
@@ -104,6 +104,6 @@ def unet_model(HEIGHT, WIDTH, CHANNELS, NUM_OUTPUTS):
             x = up_block(x, fn[idx], x_stack.pop())
 
         xout = Conv2D(NUM_OUTPUTS, (1, 1), padding="same", activation=None)(x)
-        return tf.keras.Model(inputs=xin, outputs=xout)
+        return tf.keras.Model(inputs=xin, outputs=xout, name='unet')
 
     return unet()

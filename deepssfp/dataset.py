@@ -12,6 +12,7 @@ class DataMode(Enum):
     BandRemoval2 = 'BandRemoval:2'
     SyntheticBanding = 'SyntheticBanding'
     SuperFOV = 'SuperFOV'
+    SuperFOVi = 'SuperFOVi'
 
 class Dataset:
 
@@ -79,6 +80,7 @@ class Dataset:
         np.random.shuffle(indices)
         self.input = self.x[indices]
         self.output = self.y[indices]
+        self.shuffled_indices = indices
 
         # Setup data - Use same scaler for SyntheticBanding mode
         if self.mode == 'SyntheticBanding':

@@ -8,6 +8,7 @@ def format_and_prepare_data(x, y, mode):
         2) BandRemoval:2 - Takes a subset of x data and transforms complex data into real/img components
         3) SyntheticBanding - Takes alternating subsets of data and transforms complex data into real/img components
         4) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
+        5) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (image-space), output vector also in image-space. 
     '''
     if mode == 'BandRemoval:4':
         pass
@@ -16,7 +17,7 @@ def format_and_prepare_data(x, y, mode):
     elif mode == 'SyntheticBanding':
         y = x[:,:,:,1::2]
         x = x[:,:,:,::2]
-    elif mode == 'SuperFOV':
+    elif mode == 'SuperFOV' or mode == 'SuperFOVi':
         x = x[:,:,:,::2]
         x = np.fft.fftshift(np.fft.fft2(x, axes=(1,2)), axes=(1,2))
         y = np.fft.fftshift(np.fft.fft2(y, axes=(1,2)), axes=(1,2))
@@ -26,7 +27,7 @@ def format_and_prepare_data(x, y, mode):
     x = complex_to_real_img(x)
     y = complex_to_real_img(y)
 
-    if mode == 'SuperFOV':
+    if mode == 'SuperFOV' or mode == 'SuperFOVi':
         sx = x.shape
         _x = np.zeros((sx[0], sx[1], sx[2], 2))
         _x[:,::2,:,0] = x[:,::2,:,0]
@@ -35,6 +36,13 @@ def format_and_prepare_data(x, y, mode):
         _x[:,1::2,:,1] = x[:,1::2,:,3]
         x = _x
 
+    if mode == 'SuperFOVi':
+        x = real_imag_to_complex(x)
+        y = real_imag_to_complex(y)
+        x = np.fft.ifft2(np.fft.fftshift(x, axes=(1,2)), axes=(1,2))
+        y = np.fft.ifft2(np.fft.fftshift(y, axes=(1,2)), axes=(1,2))
+        x = complex_to_real_img(x)
+        y = complex_to_real_img(y)
     return x, y
 
 def complex_to_real_img(x):
@@ -60,7 +68,7 @@ def real_imag_to_complex(x):
     ''' Converts real and imaginary dims for a tensor with a complex dim to a complex tensor '''
 
     s = x.shape
-    out = np.zeros((s[0], s[1], s[2], s[3] // 2))
+    out = np.zeros((s[0], s[1], s[2], s[3] // 2), dtype=complex)
     for ii in range(s[3] // 2):
         out[:,:,:,ii] = x[:,:,:,2*ii] + 1j * x[:,:,:,2*ii+1]
     return out

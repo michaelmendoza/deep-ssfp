@@ -12,7 +12,7 @@ import mssfp
 import deepssfp
 import deepssfp.recon
 
-def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True):
+def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None):
     """Run a single experiment with enhanced metrics collection.
     
     Parameters
@@ -43,6 +43,10 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     if os.path.isfile(ds_path):
         print(f'Saved dataset found. Loading from file: {ds_path}')
         dataset = np.load(ds_path, allow_pickle=True)[0]
+    elif custom_dataset is not None:
+        dataset = custom_dataset
+        os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+        np.save(ds_path, [dataset])
     else:
         print('Generating new dataset...')
         slices = 200
@@ -102,7 +106,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
             model_name=model_name,
             model_dir=model_dir,
             custom_dataset=ds,
-            epochs=400,
+            epochs=500,
             use_early_stopping=False,
             patience=200,
             continue_training=True
@@ -125,7 +129,11 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
 
     # Reload dataset for consistent scaling across experiments
     ds = deepssfp.Dataset(mode, input_data=data)
-    
+    seg = dataset['seg']    
+    if len(seg.shape) == 3:
+        seg = seg[ds.shuffled_indices]
+        seg = seg[-ds.x_test.shape[0]:, :]
+
     # Generate predictions
     x_test = ds.inputScaler.inverse_transform(ds.x_test)
     y_test = ds.outputScaler.inverse_transform(ds.y_test)
@@ -185,7 +193,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     band_metrics = deepssfp.evaluate_band_reduction(
         target_complex, 
         pred_complex, 
-        dataset['seg'], 
+        seg, 
         sort_values=False, 
         fig_size=(6, 2), 
         save_path=f"{path}_band_metrics"
@@ -194,13 +202,13 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     # Calculate additional image quality metrics
     print("\nCalculating image quality metrics...")
     # Get unique segment IDs from segmentation mask
-    segment_ids = np.unique(dataset['seg'])
+    segment_ids = np.unique(seg)
     # Calculate metrics for whole image and for each segment
     image_metrics = deepssfp.metrics.calculate_image_metrics(
         target_complex, 
         pred_complex,
         segment_ids=segment_ids,
-        segmentation=dataset['seg']
+        segmentation=seg
     )
     
     # Print metrics summary
@@ -226,7 +234,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
         'band_metrics': band_metrics
     }
 
-def run_all_experiments(modes=None, model_name="block_phantom", model_dir="D:/DeepSSFP/", train_models=True):
+def run_all_experiments(modes=None, model_name="block_phantom", model_dir="D:/DeepSSFP/", train_models=True, custom_dataset=None):
     """Run all experiments and compare results.
     
     Parameters
@@ -250,7 +258,8 @@ def run_all_experiments(modes=None, model_name="block_phantom", model_dir="D:/De
             mode=mode,
             model_name=model_name,
             model_dir=model_dir,
-            train_model=train_models
+            train_model=train_models,
+            custom_dataset=custom_dataset
         )
     
     '''
@@ -660,6 +669,7 @@ def print_comparison_summary(
 if __name__ == "__main__":
     # Configure output directory
     model_dir = "D:/DeepSSFP/"
+    model_name="brain_phantom"
     
     # Run individual experiments
     # run_experiment(mode='BandRemoval:2', model_dir=model_dir)
@@ -667,9 +677,18 @@ if __name__ == "__main__":
     # run_experiment(mode='SuperFOV', model_dir=model_dir)
     
     # Or run all experiments and compare
+    '''
     run_all_experiments(
         modes=['BandRemoval:2', 'BandRemoval:4', 'SuperFOV'],
         model_name="block_phantom",
         model_dir=model_dir,
         train_models=True  # Set to False to use pre-trained models
+    )'
+    '''
+    run_experiment(
+        mode=deepssfp.DataMode.SyntheticBanding.value, 
+        model_name=model_name,
+        model_dir=model_dir,
+        train_model=True,
+        #custom_dataset=dataset
     )
