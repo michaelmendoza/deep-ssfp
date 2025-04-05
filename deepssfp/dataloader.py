@@ -1,10 +1,67 @@
+import re
 import os
 import numpy as np
 import mapvbvd
-from pathlib import Path
 from typing import List, Dict, Any, Optional
+from tqdm import tqdm
+from pydicom import dcmread
+from pathlib import Path
 
-from deepssfp import recon
+from deepssfp import recon, dataloader
+
+def load_datasets(datapath, cachepath = './', cache_filename = 'phantom_dataset_cache', filter = None, indices = None):
+    ''' Loads raw data from a folderpath and caches it into a npy file.
+        If cached data is available, it will be loaded instead of loading from the folderpath.
+        
+        Parameters
+        ----------
+        datapath : str
+            Path to folder containing raw data
+        cachepath : str, optional
+            Path to folder to save cached data, by default './'
+        cache_filename : str, optional
+            Name of cached data file, by default 'phantom_dataset_cache'
+        filter : str, optional
+            Filter to apply to files, by default None
+        indices : list, optional
+            List of indices to load, by default None
+        
+        Returns
+        -------
+        np.ndarray
+            Loaded dataset
+    '''
+    datapath = os.path.normpath(datapath)
+    cachepath = os.path.normpath(cachepath)
+
+    # Load cached data 
+    if(os.path.isfile(f'{cache_filename}.npy')):
+        print('Cached data found. Loading...')
+        cache = np.load(f'./{cache_filename}.npy', allow_pickle=True)[0]
+        print('Dataset loaded:', cache.shape)
+        return cache
+    
+    files = os.listdir(datapath)
+    files.sort()
+
+    if filter:
+        files = [file for file in files if filter in file]
+
+    if indices:
+        files = [files[i] for i in indices]
+
+    print(f'Path: {datapath}')
+    print(f'Loading files: {files}')
+
+    dataset = [dataloader.read_rawdata(os.path.join(datapath, file)) for file in files]
+    dataset = np.stack([data['data'] for data in dataset], axis=-1)
+    print('Dataset loaded:', dataset.shape)
+
+    # Cache rawdata into npy file
+    np.save(os.path.join(cachepath, cache_filename), [dataset])
+    print(f'Dataset cached as {os.path.join(cachepath, cache_filename)}.npy')
+
+    return dataset
 
 data_folderpath = '../../../data/2017_DeepSSFP/11062017_SSFP_Smoothing_DL_Phantom'
 cache_filename = 'deep_ssfp_phantom_dataset_cache'
@@ -12,11 +69,15 @@ cache_filename = 'deep_ssfp_phantom_dataset_cache'
 def load():
     ''' Loads and processes raw data into input (x) data tensor and output (y) data tensor.
         Loads data from cache if cached data is available. Output data is generated using
-        the elliptical signal model band reduction method. 
+        the elliptical signal model band reduction method.
+
+        Note: This function is deprecated and will be removed in a future release.
+        Use load_datasets() instead.
     '''
 
     # Load cached data 
     if(os.path.isfile(f'{cache_filename}.npy')):
+        print('Cached data found. Loading...')
         cache = np.load(f'./{cache_filename}.npy', allow_pickle=True)[0]
         x = cache['x']
         y = cache['y']
@@ -24,6 +85,7 @@ def load():
 
     # Load filepath from folderpath and organze in filesets
     filesets = load_filepaths()
+    filesets = [filesets[0:4], filesets[4:8]]
 
     # Load and process rawdata into rawdata tensor
     M = []
@@ -44,11 +106,11 @@ def load():
     # Return input / output dataset 
     return x, y
 
-def load_filepaths():
+def load_filepaths(datapath = data_folderpath):
     ''' Retrieves valid filepaths from a folderpath. Filepath are organized to sets of four files '''
 
     # Get file paths
-    path = Path(data_folderpath)
+    path = Path(datapath)
     valid_filetypes=['.dat']
     files = []
     for item in path.iterdir():
@@ -56,8 +118,7 @@ def load_filepaths():
             files.append(item)
     files.sort()
 
-    filesets = [files[0:4], files[4:8]]
-    return filesets
+    return files
 
 def load_data_and_prepare(files):
     ''' Loads and prepares raw data from a list of filepaths '''
@@ -127,3 +188,112 @@ def read_rawdata(filepath: str, datatype: str = 'image', doChaAverage: bool = Tr
         'max': float(np.nanmax(np.abs(data))),
         'isComplex': np.iscomplexobj(data)
     }
+
+def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None):
+    base_filepath = os.path.normpath(base_filepath)
+    save_filepath = os.path.join(base_filepath, cache_filename)
+    folders_list = os.listdir(base_filepath) #gives you the list of folders within the Michael_data_for_ML_model folder
+
+    if cache_filename in folders_list:
+        folders_list.remove(cache_filename)
+
+    sorted_folders = sorted(folders_list, key=lambda x: int(x[2:].split("_")[0])) #sorting the folders based on the number after HV
+    # Note that the folders are now sorted based on the HV - I have not sorted them based on the knee and repetition as that is
+    # not relevant for training or testing and the files will anyway be saved as npy files with the appropriate knee and rep
+    # later
+    
+    if filters:
+        sorted_folders = list(filter(lambda x: any(f in x for f in filters), sorted_folders))  
+
+    folder_names = ['pc_0', 'pc_90', 'pc_180', 'pc_270']
+
+    datasets = []
+    for i in range(len(sorted_folders)): #take the 1st 20 sorted folders for the training data
+        combined_filepath = os.path.join(base_filepath, sorted_folders[i])
+        complex_images = load_dicom_dataset(combined_filepath, folder_names)
+        datasets.append(complex_images)
+    
+    # Prepare data 
+    m = np.stack(datasets, axis=0)
+    return m
+
+def extract_numbers(files):
+    match = re.search(r'\.(\d+)\.(\d+)\.', files)
+    if match:
+        return int(match.group(1)), int(match.group(2))  # Extract second and third numbers
+    return (0, 0)  # Default in case of no match
+
+def mag_phase_to_complex(mag, phase):
+    """
+    Function that takes in magnitude and phase images and returns a complex image.
+
+    Parameters
+    ----------
+    mag : array_like
+        Magnitude images of shape (n, l, w), where n is the number of slices (images), 
+        l is the number of rows, and w is the number of columns.
+
+    phase : array_like
+        Phase images of shape (n, l, w).
+
+    Returns
+    -------
+    image : array_like
+        Complex image of shape (n, l, w) calculated using the magnitude and phase data.
+    """
+    # Compute the real and imaginary parts using vectorized operations  
+    real_part = mag * np.cos(phase)  # Shape: (n, l, w)
+    imag_part = mag * np.sin(phase)  # Shape: (n, l, w)
+    
+    # Combine real and imaginary parts to create a complex array of shape (n, l, w)
+    complex_image = real_part + 1j * imag_part  # Shape: (n, l, w)
+
+    return complex_image #np.transpose(complex_image, (1, 2, 0))  # Shape: (l, w, n)
+
+def load_dicom_dataset(base_filepath, folder_names):
+
+    """
+    Function that loads in the DICOM phase-cycled bSSFP data and returns the
+    images in a single array.
+    
+    Arguments:
+    ----------
+    - base_filepath: string, directory containing the folders for each phase
+                     cycle
+    - folder_names: list of strings, folder names, with each folder 
+                    containing mag/phase images acquired with diff phase 
+                    cycling increments.
+    
+    
+    Returns:
+    --------
+    - pc_bSSFP_imgs: numpy array, phase-cycled bSSFP images of size 
+                     (80, 416, 416, 4), with each slice being of size 80 slices, 
+                     416x416 length and width, and 4 phase-cycled images
+    """
+    
+    
+    # Initialize an empty array for complex images
+    pc_bSSFP_imgs = np.empty((80, 416, 416, 4), dtype=np.complex64)
+    idx_mg = np.arange(0, 80)  # Magnitude indices
+    idx_ph = np.arange(80, 160)  # Phase indices
+
+    for f in tqdm(range(len(folder_names))):
+        filepath = os.path.join(base_filepath, folder_names[f])
+
+        ds_path_list = os.listdir(filepath)
+        ds_path_list_sorted = sorted(ds_path_list, key=lambda x: extract_numbers(x))
+        ds = [dcmread(os.path.join(filepath ,ds_path)) for ds_path in ds_path_list_sorted]  # List comprehension to read DICOMs
+
+        # Load magnitude and phase arrays
+        arr_mg_list = np.array([ds[i].pixel_array for i in idx_mg])  # Collecting magnitude images
+        arr_ph_list = np.array([ds[i].pixel_array for i in idx_ph])  # Collecting phase images
+
+        # Normalize phase images
+        arr_ph_normalized = np.pi * ((arr_ph_list - (np.max(arr_ph_list, axis=(1, 2), keepdims=True) / 2)) / 
+                                      (np.max(arr_ph_list, axis=(1, 2), keepdims=True) / 2))
+
+        # Calculate complex images
+        pc_bSSFP_imgs[:, :, :, f] = mag_phase_to_complex(arr_mg_list, arr_ph_normalized)
+
+    return pc_bSSFP_imgs

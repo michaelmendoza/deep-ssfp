@@ -148,6 +148,7 @@ def create_callbacks(
 def train(
     mode: str = dataset.modes[0],
     epochs: int = 200,
+    lr: float = 1e-3,
     model_name: str = "deepssfp",
     model_dir: str = 'saved_models',
     continue_training: bool = False,
@@ -160,7 +161,11 @@ def train(
     validation_steps: int = 10,
     use_early_stopping: bool = True,
     patience: int = 20,
-    use_tensorboard: bool = False
+    use_tensorboard: bool = False,
+    fine_tune: bool = False,
+    fine_tune_model_path: str = '',
+    fine_tune_suffix: str = "finetuned",
+    fine_tune_lr: float = 1e-5,
 ) -> Tuple[tf.keras.Model, tf.keras.callbacks.History, Dataset, np.ndarray]:
     """Train the DeepSSFP model with support for saving and loading with .keras format.
     
@@ -196,7 +201,15 @@ def train(
         Patience for early stopping and learning rate reduction
     use_tensorboard : bool
         Whether to use TensorBoard logging
-        
+    fine_tune : bool
+        If True, fine-tune an existing model instead of training from scratch
+    fine_tune_model_path : str, optional
+        Path of the source model to fine-tune (path + filename without extension)
+    fine_tune_suffix : str
+        Suffix to add to the model name for the fine-tuned model
+    fine_tune_lr : float
+        Learning rate to use for fine-tuning, typically lower than for initial training
+
     Returns
     -------
     model : tf.keras.Model
@@ -213,6 +226,13 @@ def train(
     
     # Generate model path based on model_name and mode
     mode_str = mode.lower().replace(':', '_')
+
+    # For fine-tuning, use a different model name to avoid overwriting the original
+    if fine_tune:                    
+        model_name = f"{model_name}_{fine_tune_suffix}"
+        fine_tune_history_path = f"{fine_tune_model_path}_history.npz"
+        fine_tune_model_path = f"{fine_tune_model_path}.keras"
+
     model_path = os.path.join(model_dir, f"{model_name}_{mode_str}")
     logger.info(f"Model will be saved to: {model_path}")
     
@@ -272,6 +292,31 @@ def train(
             
             initial_epoch = len(history_dict['loss'])
             logger.info(f"Continuing training from epoch {initial_epoch}")
+
+    # Load source model for fine-tuning
+    elif fine_tune and os.path.exists(fine_tune_model_path):
+        logger.info(f"Loading source model for fine-tuning from {fine_tune_model_path}")
+        model = tf.keras.models.load_model(fine_tune_model_path)
+
+        # Use a lower learning rate for fine-tuning
+        logger.info(f"Recompiling model with fine-tuning learning rate: {fine_tune_lr}")
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=fine_tune_lr),
+            loss=tf.keras.losses.MeanSquaredError(),
+            metrics=[tf.keras.metrics.MeanAbsoluteError()]
+        )
+
+        # Load training history if it exists
+        if os.path.exists(fine_tune_history_path):
+            logger.info(f"Loading training history from {fine_tune_history_path}")
+            history_data = np.load(fine_tune_history_path)
+            for key in history_dict.keys():
+                if key in history_data:
+                    history_dict[key] = history_data[key].tolist()
+            
+            initial_epoch = len(history_dict['loss'])
+            logger.info(f"Continuing training from epoch {initial_epoch}")
+    
     else:
         # Create new model
         logger.info(f"Creating new model with dimensions: {HEIGHT}x{WIDTH}x{CHANNELS}→{NUM_OUTPUTS}")
@@ -279,7 +324,7 @@ def train(
         logger.info(f"Model created: {model.name}")
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
             loss=tf.keras.losses.MeanSquaredError(),
             metrics=[tf.keras.metrics.MeanAbsoluteError()]
         )

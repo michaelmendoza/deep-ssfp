@@ -40,15 +40,15 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     print(f"Dataset path: {ds_path}")
 
     # Load or generate dataset
-    if os.path.isfile(ds_path):
+    if custom_dataset is not None:
+        dataset = custom_dataset
+        #os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+        #np.save(ds_path, [dataset])    
+    elif os.path.isfile(ds_path):
         print(f'Saved dataset found. Loading from file: {ds_path}')
         dataset = np.load(ds_path, allow_pickle=True)[0]
-    elif custom_dataset is not None:
-        dataset = custom_dataset
-        os.makedirs(os.path.dirname(ds_path), exist_ok=True)
-        np.save(ds_path, [dataset])
     else:
-        print('Generating new dataset...')
+        print('Generating new mock phantomdataset...')
         slices = 200
         tissue_parameters = {
             0: ('none', 0, 0, 0),
@@ -113,11 +113,15 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
         )
     else:
         print("\nLoading pre-trained model...")
-        model, history_dict = deepssfp.load_model(
-            mode=mode,
-            model_name=model_name,
-            model_dir=model_dir
-        )
+        try:
+            model, history_dict = deepssfp.load_model(
+                mode=mode,
+                model_name=model_name,
+                model_dir=model_dir
+            )
+        except FileNotFoundError:
+            print("No pre-trained model found. Exiting ...")
+            return
         
     # Plot training history if available
     if history_dict:
