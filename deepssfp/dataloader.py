@@ -9,7 +9,7 @@ from pathlib import Path
 
 from deepssfp import recon, dataloader
 
-def load_datasets(datapath, cachepath = './', cache_filename = 'phantom_dataset_cache', filter = None, indices = None):
+def load_raw_datasets(datapath, cachepath = './', cache_filename = 'phantom_dataset_cache', filter = None, indices = None, save_dataset=True):
     ''' Loads raw data from a folderpath and caches it into a npy file.
         If cached data is available, it will be loaded instead of loading from the folderpath.
         
@@ -25,6 +25,8 @@ def load_datasets(datapath, cachepath = './', cache_filename = 'phantom_dataset_
             Filter to apply to files, by default None
         indices : list, optional
             List of indices to load, by default None
+        save_dataset : bool, optional
+            Whether to save the dataset to disk, by default True
         
         Returns
         -------

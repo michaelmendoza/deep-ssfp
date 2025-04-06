@@ -12,7 +12,7 @@ import mssfp
 import deepssfp
 import deepssfp.recon
 
-def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None):
+def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, save_dataset=True):
     """Run a single experiment with enhanced metrics collection.
     
     Parameters
@@ -25,6 +25,10 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
         Directory to save/load model weights and results
     train_model : bool
         Whether to train a new model or load an existing one
+    custom_dataset : dict, optional
+        Dictionary containing custom dataset
+    save_dataset : bool, optional
+        Whether to save the dataset to disk
         
     Returns
     -------
@@ -42,8 +46,9 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     # Load or generate dataset
     if custom_dataset is not None:
         dataset = custom_dataset
-        #os.makedirs(os.path.dirname(ds_path), exist_ok=True)
-        #np.save(ds_path, [dataset])    
+        if save_dataset:
+            os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+            np.save(ds_path, [dataset])    
     elif os.path.isfile(ds_path):
         print(f'Saved dataset found. Loading from file: {ds_path}')
         dataset = np.load(ds_path, allow_pickle=True)[0]
@@ -77,8 +82,9 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
             useRotate=True, 
             useDeform=True
         )
-        os.makedirs(os.path.dirname(ds_path), exist_ok=True)
-        np.save(ds_path, [dataset])
+        if save_dataset:
+            os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+            np.save(ds_path, [dataset])
 
     # Load dataset for experiment
     data = dataset['M']
