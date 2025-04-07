@@ -138,7 +138,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
         )
 
     # Reload dataset for consistent scaling across experiments
-    ds = deepssfp.Dataset(mode, input_data=data)
+    #ds = deepssfp.Dataset(mode, input_data=data)
     seg = dataset['seg']    
     if len(seg.shape) == 3:
         seg = seg[ds.shuffled_indices]

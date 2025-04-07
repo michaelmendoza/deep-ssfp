@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 from pydicom import dcmread
 from pathlib import Path
+from skimage.filters import threshold_li
 
 from deepssfp import recon, dataloader
 
@@ -58,15 +59,28 @@ def load_raw_datasets(datapath, cachepath = './', cache_filename = 'phantom_data
     dataset = [dataloader.read_rawdata(os.path.join(datapath, file)) for file in files]
     dataset = np.stack([data['data'] for data in dataset], axis=-1)
     print('Dataset loaded:', dataset.shape)
+    print(f"Memory size: {dataset.nbytes / 1000000000} GB")
 
     # Cache rawdata into npy file
     np.save(os.path.join(cachepath, cache_filename), [dataset])
     print(f'Dataset cached as {os.path.join(cachepath, cache_filename)}.npy')
 
+    # Create segmentation mask
+    seg = create_segmentation_mask(dataset)
+    dataset = { 'M': dataset, 'seg': seg }
     return dataset
 
 data_folderpath = '../../../data/2017_DeepSSFP/11062017_SSFP_Smoothing_DL_Phantom'
 cache_filename = 'deep_ssfp_phantom_dataset_cache'
+
+def create_segmentation_mask(M):
+    # Create mask of phantom
+    _ = np.sqrt(np.sum(np.abs(M)**2, axis=3))
+    _ = abs(_)
+    thresh = threshold_li(_)
+    mask = np.abs(_) > thresh
+    seg = mask * 1
+    return seg
 
 def load():
     ''' Loads and processes raw data into input (x) data tensor and output (y) data tensor.
@@ -217,7 +231,19 @@ def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images'
     
     # Prepare data 
     m = np.stack(datasets, axis=0)
-    return m
+
+    # Reshape to combine slices and datasets into single dimension
+    new_shape = (m.shape[0] * m.shape[1],) + m.shape[2:]
+    m = m.reshape(new_shape)
+    print(m.shape)
+
+    print('Dataset loaded:', m.shape)
+    print(f"Memory size: {m.nbytes / 1000000000} GB")
+
+    # Create segmentation mask
+    seg = create_segmentation_mask(m)
+    dataset = { 'M': m, 'seg': seg }
+    return dataset
 
 def extract_numbers(files):
     match = re.search(r'\.(\d+)\.(\d+)\.', files)
