@@ -205,7 +205,7 @@ def read_rawdata(filepath: str, datatype: str = 'image', doChaAverage: bool = Tr
         'isComplex': np.iscomplexobj(data)
     }
 
-def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None, data_format='RealImag'):
+def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None, data_format='Complex'):
     base_filepath = os.path.normpath(base_filepath)
     save_filepath = os.path.join(base_filepath, cache_filename)
     folders_list = os.listdir(base_filepath) #gives you the list of folders within the Michael_data_for_ML_model folder

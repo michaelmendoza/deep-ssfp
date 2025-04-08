@@ -119,7 +119,7 @@ def run_training(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:
             model_dir=model_dir,
             custom_dataset=ds,
             epochs=800,
-            use_early_stopping=False,
+            use_early_stopping=True,
             patience=200,
             continue_training=True
         )
