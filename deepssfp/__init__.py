@@ -1,4 +1,4 @@
-from .dataset import Dataset, DataMode
+from .dataset import Dataset, DataMode, StandardScaler
 from .deepssfp import train, load_model, predict, plot_training_history
 from .metrics import evaluate_band_reduction
 from .plotlib import visualize_images

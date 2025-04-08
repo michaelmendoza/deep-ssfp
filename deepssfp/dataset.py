@@ -16,7 +16,7 @@ class DataMode(Enum):
 
 class Dataset:
 
-    def __init__(self, mode, input_data=None, output_data=None, stats_faction : float = 1.0):
+    def __init__(self, mode, input_data=None, output_data=None, ratio = 0.8, stats_faction : float = 1.0, scaler = None):
         """Initialize Dataset with either provided data or loaded data.
             
             Parameters
@@ -37,9 +37,11 @@ class Dataset:
         self.WIDTH = self.x.shape[2]
         self.CHANNELS_IN = self.x.shape[3]
         self.CHANNELS_OUT = self.y.shape[3]
-        self.ratio = 0.8
+        self.ratio = ratio
+        self.scaler = scaler
         self.stats_faction = stats_faction
         self.dtype = self.x.dtype
+
         print(f"Dataset: mode:{self.mode}, size:{self.SIZE} height:{self.HEIGHT} width:{self.WIDTH} cin:{self.CHANNELS_IN} cout:{self.CHANNELS_OUT} ratio:{self.ratio}")
         print(f"dtype: {self.x.dtype}, {self.y.dtype}")
 
@@ -83,16 +85,21 @@ class Dataset:
     def generate(self):
         ''' Generates training/test dataset '''
         
-        # Setup data - Use same scaler for SyntheticBanding mode
-        if self.mode == 'SyntheticBanding':
-            print('Using same scaler for SyntheticBanding mode')
-            combined_data = np.concatenate((self.x, self.y), axis=0).astype(self.dtype)
-            self.inputScaler = StandardScaler(combined_data, self.stats_faction)
-            self.outputScaler = StandardScaler(combined_data, self.stats_faction)
+        if self.scaler is not None:
+            print("Using provided scaler")
+            self.inputScaler = self.scaler
+            self.outputScaler = self.scaler
         else:
-            self.inputScaler = StandardScaler(self.x, self.stats_faction)
-            self.outputScaler = StandardScaler(self.y, self.stats_faction)
-        del combined_data
+        # Setup data - Use same scaler for SyntheticBanding mode
+            if self.mode == 'SyntheticBanding':
+                print('Using same scaler for SyntheticBanding mode')
+                combined_data = np.concatenate((self.x, self.y), axis=0).astype(self.dtype)
+                self.inputScaler = StandardScaler(combined_data, self.stats_faction)
+                self.outputScaler = StandardScaler(combined_data, self.stats_faction)
+            else:
+                self.inputScaler = StandardScaler(self.x, self.stats_faction)
+                self.outputScaler = StandardScaler(self.y, self.stats_faction)
+            del combined_data
 
         # Setup data
         self.x = self.inputScaler.transform(self.x).astype(self.dtype)
@@ -142,7 +149,12 @@ class Dataset:
             return y
         
 class StandardScaler:
-    def __init__(self, data: np.ndarray, stats_faction : float = 1.0):
+    def __init__(self, data: np.ndarray, stats_faction : float = 1.0, mean = None, std = None):
+        if mean is not None and std is not None:
+            self.mean = mean
+            self.std = std
+            return
+        
         if stats_faction == 1:
             self.mean = np.mean(data, dtype=np.float64)
             self.std = np.std(data, dtype=np.float64)
