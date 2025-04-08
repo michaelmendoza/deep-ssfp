@@ -135,12 +135,16 @@ def _get_complex_cross_point(Is):
     x4, y4 = Is[3, ...].real, Is[3, ...].imag
 
     den = (x1 - x3)*(y2 - y4) + (x2 - x4)*(y3 - y1)
-    if (den == 0).any():
+
+    num = ((x1*y3 - x3*y1)*(Is[1, ...] - Is[3, ...]) - (
+        x2*y4 - x4*y2)*(Is[0, ...] - Is[2, ...]))
+    
+    threshold = np.finfo(float).eps * 5
+    if (np.abs(den) < threshold).any():
         # Make sure we're not dividing by zero
         den += np.finfo(float).eps
 
-    M = ((x1*y3 - x3*y1)*(Is[1, ...] - Is[3, ...]) - (
-        x2*y4 - x4*y2)*(Is[0, ...] - Is[2, ...]))/den
+    M = num/den
     return M
 
 def _compute_Iw(

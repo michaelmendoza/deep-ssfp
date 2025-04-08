@@ -8,7 +8,7 @@ from pydicom import dcmread
 from pathlib import Path
 from skimage.filters import threshold_li
 
-from deepssfp import recon, dataloader
+from deepssfp import recon, dataloader, transforms
 
 def load_raw_datasets(datapath, cachepath = './', cache_filename = 'phantom_dataset_cache', filter = None, indices = None, save_dataset=True):
     ''' Loads raw data from a folderpath and caches it into a npy file.
@@ -205,7 +205,7 @@ def read_rawdata(filepath: str, datatype: str = 'image', doChaAverage: bool = Tr
         'isComplex': np.iscomplexobj(data)
     }
 
-def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None):
+def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None, data_format='RealImag'):
     base_filepath = os.path.normpath(base_filepath)
     save_filepath = os.path.join(base_filepath, cache_filename)
     folders_list = os.listdir(base_filepath) #gives you the list of folders within the Michael_data_for_ML_model folder
@@ -227,22 +227,30 @@ def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images'
     for i in range(len(sorted_folders)): #take the 1st 20 sorted folders for the training data
         combined_filepath = os.path.join(base_filepath, sorted_folders[i])
         complex_images = load_dicom_dataset(combined_filepath, folder_names)
-        datasets.append(complex_images)
-    
+
+        if (data_format == 'RealImag'):
+            complex_images = transforms.from_complex_to_pairs(complex_images)
+            complex_images = complex_images.astype(np.float16)
+            datasets.append(complex_images)
+        else:
+            datasets.append(complex_images)
+
     # Prepare data 
     m = np.stack(datasets, axis=0)
 
     # Reshape to combine slices and datasets into single dimension
     new_shape = (m.shape[0] * m.shape[1],) + m.shape[2:]
     m = m.reshape(new_shape)
-    print(m.shape)
+
+    # Create segmentation mask (for complex data only)
+    if (data_format != 'RealImag'):
+        seg = create_segmentation_mask(m).astype(np.uint8)
+        dataset = { 'M': m, 'seg': seg }
+    else:
+        dataset = { 'M': m }
 
     print('Dataset loaded:', m.shape)
     print(f"Memory size: {m.nbytes / 1000000000} GB")
-
-    # Create segmentation mask
-    seg = create_segmentation_mask(m)
-    dataset = { 'M': m, 'seg': seg }
     return dataset
 
 def extract_numbers(files):

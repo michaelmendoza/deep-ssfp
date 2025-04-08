@@ -16,7 +16,7 @@ class DataMode(Enum):
 
 class Dataset:
 
-    def __init__(self, mode, input_data=None, output_data=None):
+    def __init__(self, mode, input_data=None, output_data=None, stats_faction : float = 1.0):
         """Initialize Dataset with either provided data or loaded data.
             
             Parameters
@@ -38,6 +38,10 @@ class Dataset:
         self.CHANNELS_IN = self.x.shape[3]
         self.CHANNELS_OUT = self.y.shape[3]
         self.ratio = 0.8
+        self.stats_faction = stats_faction
+        self.dtype = self.x.dtype
+        print(f"Dataset: mode:{self.mode}, size:{self.SIZE} height:{self.HEIGHT} width:{self.WIDTH} cin:{self.CHANNELS_IN} cout:{self.CHANNELS_OUT} ratio:{self.ratio}")
+        print(f"dtype: {self.x.dtype}, {self.y.dtype}")
 
         self.generate()
 
@@ -66,48 +70,50 @@ class Dataset:
             # Load default data if no custom data provided
             x, y = dataloader.load()
 
-        #print(f'X: {x.shape}')
-        x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
-        #print(f'X: {x.shape} Y: {y.shape}')
+        if input_data is None or output_data is None:
+            # Format data
+            print('Formatting data...')
+            x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
+        else:
+            print('Info: Data all ready formated.')
+            x, y = (input_data, output_data)
 
         return x, y
 
     def generate(self):
         ''' Generates training/test dataset '''
-
-        # Shuffle data
-        indices = np.arange(self.SIZE)
-        np.random.shuffle(indices)
-        self.input = self.x[indices]
-        self.output = self.y[indices]
-        self.shuffled_indices = indices
-
+        
         # Setup data - Use same scaler for SyntheticBanding mode
         if self.mode == 'SyntheticBanding':
             print('Using same scaler for SyntheticBanding mode')
-            combined_data = np.concatenate((self.input, self.output), axis=0)
-            self.inputScaler = StandardScaler(combined_data)
-            self.outputScaler = StandardScaler(combined_data)
+            combined_data = np.concatenate((self.x, self.y), axis=0).astype(self.dtype)
+            self.inputScaler = StandardScaler(combined_data, self.stats_faction)
+            self.outputScaler = StandardScaler(combined_data, self.stats_faction)
         else:
-            self.inputScaler = StandardScaler(self.input)
-            self.outputScaler = StandardScaler(self.output)
+            self.inputScaler = StandardScaler(self.x, self.stats_faction)
+            self.outputScaler = StandardScaler(self.y, self.stats_faction)
+        del combined_data
 
         # Setup data
-        self.input = self.inputScaler.transform(self.input)
-        self.output = self.outputScaler.transform(self.output)
+        self.x = self.inputScaler.transform(self.x).astype(self.dtype)
+        self.y = self.outputScaler.transform(self.y).astype(self.dtype)
 
         # Split data into test/training sets
-        index = int(self.ratio * len(self.input)) # Split index
-        self.x_train = self.input[0:index, :]
-        self.y_train = self.output[0:index]
-        self.x_test = self.input[index:,:]
-        self.y_test = self.output[index:]
+        index = int(self.ratio * len(self.x)) # Split index
+        self.x_train = self.x[0:index, :]
+        self.y_train = self.y[0:index]
+        self.x_test = self.x[index:,:]
+        self.y_test = self.y[index:]
+
+        # Clear memory
+        del self.x
+        del self.y
 
     def next_batch(self, batch_size):
         ''' Retrieves next samples of training data '''
-        length = self.input.shape[0]
+        length = self.x.shape[0]
         indices = np.random.randint(0, length, batch_size)
-        return [self.input[indices], self.output[indices]]
+        return [self.x[indices], self.y[indices]]
 
     def plot(self):
         pass
@@ -115,8 +121,8 @@ class Dataset:
     def histogram(self):
         ''' Plots histogram plots of input/output data '''
         n_bins = 20
-        dist1 = self.input.reshape(-1)
-        dist2 = self.output.reshape(-1)
+        dist1 = self.x.reshape(-1)
+        dist2 = self.y.reshape(-1)
 
         fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
 
@@ -136,14 +142,20 @@ class Dataset:
             return y
         
 class StandardScaler:
-    def __init__(self, data):
-        self.mean = np.mean(data)
-        self.std = np.std(data)
+    def __init__(self, data: np.ndarray, stats_faction : float = 1.0):
+        if stats_faction == 1:
+            self.mean = np.mean(data, dtype=np.float64)
+            self.std = np.std(data, dtype=np.float64)
+        else:
+            indices = np.random.choice(range(data.shape[0]), size=data.shape[0] * stats_faction, replace=False)
+            self.mean = np.mean(data[indices], dtype=np.float64)
+            self.std = np.std(data[indices], dtype=np.float64)
+
     
-    def transform(self, data):
+    def transform(self, data) -> np.ndarray:
         ''' Transforms data using mean/std statistics '''
         return (data - self.mean) / self.std
 
-    def inverse_transform(self, data):
+    def inverse_transform(self, data) -> np.ndarray:
         ''' Transforms data using mean/std statistics '''
-        return data * self.std + self.mean
+        return data * self.std + self.mean    

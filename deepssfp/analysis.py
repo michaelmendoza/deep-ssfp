@@ -12,8 +12,8 @@ import mssfp
 import deepssfp
 import deepssfp.recon
 
-def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, save_dataset=True):
-    """Run a single experiment with enhanced metrics collection.
+def run_training(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, ds = None, save_dataset=True) -> dict:
+    """Run a single training experiment.
     
     Parameters
     ----------
@@ -44,54 +44,60 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     print(f"Dataset path: {ds_path}")
 
     # Load or generate dataset
-    if custom_dataset is not None:
-        dataset = custom_dataset
-        if save_dataset:
-            os.makedirs(os.path.dirname(ds_path), exist_ok=True)
-            np.save(ds_path, [dataset])    
-    elif os.path.isfile(ds_path):
-        print(f'Saved dataset found. Loading from file: {ds_path}')
-        dataset = np.load(ds_path, allow_pickle=True)[0]
+    if ds is None:
+        print('Creating ds ...')
+
+        if custom_dataset is not None:
+            dataset = custom_dataset
+            if save_dataset:
+                os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+                np.save(ds_path, [dataset])    
+        elif os.path.isfile(ds_path):
+            print(f'Saved dataset found. Loading from file: {ds_path}')
+            dataset = np.load(ds_path, allow_pickle=True)[0]
+        else:
+            print('Generating new mock phantomdataset...')
+            slices = 200
+            tissue_parameters = {
+                0: ('none', 0, 0, 0),
+                1: ('fat', 0.350, 0.130, 0),
+                2: ('bone marrow', 0.370, 0.05, 0),
+                3: ('liver', 0.8, 0.04, 0),
+                4: ('white matter', 1.0, 0.08, 0),
+                5: ('myocardium', 1.150, 0.045, 0),
+                6: ('vessels', 1.2, 0.05, 0),   
+                7: ('gray matter', 1.3, 0.110, 0),
+                8: ('muscle', 1.4, 0.030, 0),
+                9: ('CSF', 4.0, 1.0, 0)
+            }
+
+            dataset = mssfp.generate_ssfp_dataset(
+                phantom_type='block', 
+                slices=slices, 
+                shape=128, 
+                ids=[1, 2, 3, 4, 5, 6, 7, 8, 9],
+                tissues = tissue_parameters,
+                npcs=4, 
+                f=500, 
+                alpha=np.deg2rad(60), 
+                sigma=0.001, 
+                data_indices=[(0, 2), (120,180)], 
+                useRotate=True, 
+                useDeform=True
+            )
+            if save_dataset:
+                os.makedirs(os.path.dirname(ds_path), exist_ok=True)
+                np.save(ds_path, [dataset])
+
+        # Load dataset for experiment
+        data = dataset['M']
+        print(f"Data shape: {data.shape}")
+        
+        # Create experiment dataset
+        ds = deepssfp.dataset.Dataset(mode, input_data=data)
     else:
-        print('Generating new mock phantomdataset...')
-        slices = 200
-        tissue_parameters = {
-            0: ('none', 0, 0, 0),
-            1: ('fat', 0.350, 0.130, 0),
-            2: ('bone marrow', 0.370, 0.05, 0),
-            3: ('liver', 0.8, 0.04, 0),
-            4: ('white matter', 1.0, 0.08, 0),
-            5: ('myocardium', 1.150, 0.045, 0),
-            6: ('vessels', 1.2, 0.05, 0),   
-            7: ('gray matter', 1.3, 0.110, 0),
-            8: ('muscle', 1.4, 0.030, 0),
-            9: ('CSF', 4.0, 1.0, 0)
-        }
+        print('Info: dataset (ds) already loaded.')
 
-        dataset = mssfp.generate_ssfp_dataset(
-            phantom_type='block', 
-            slices=slices, 
-            shape=128, 
-            ids=[1, 2, 3, 4, 5, 6, 7, 8, 9],
-            tissues = tissue_parameters,
-            npcs=4, 
-            f=500, 
-            alpha=np.deg2rad(60), 
-            sigma=0.001, 
-            data_indices=[(0, 2), (120,180)], 
-            useRotate=True, 
-            useDeform=True
-        )
-        if save_dataset:
-            os.makedirs(os.path.dirname(ds_path), exist_ok=True)
-            np.save(ds_path, [dataset])
-
-    # Load dataset for experiment
-    data = dataset['M']
-    print(f"Data shape: {data.shape}")
-    
-    # Create experiment dataset
-    ds = deepssfp.dataset.Dataset(mode, input_data=data)
     print(f"Training data shape: {ds.x_train.shape}, {ds.y_train.shape}")
     print(f"Input scaler stats: mean={ds.inputScaler.mean:.4f}, std={ds.inputScaler.std:.4f}")
     print(f"Output scaler stats: mean={ds.outputScaler.mean:.4f}, std={ds.outputScaler.std:.4f}")
@@ -112,7 +118,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
             model_name=model_name,
             model_dir=model_dir,
             custom_dataset=ds,
-            epochs=500,
+            epochs=800,
             use_early_stopping=False,
             patience=200,
             continue_training=True
@@ -137,11 +143,48 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
             save_path=f"{path}_training_history.png"
         )
 
+    # Return results dictionary
+    return {
+        'mode': mode,
+        'model': model,
+        'dataset': ds
+    }
+
+def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, save_dataset=True):
+    """Run a single experiment with enhanced metrics collection.
+    
+    Parameters
+    ----------
+    mode : str
+        Training mode from dataset.modes
+    model_name : str
+        Base name for the model
+    model_dir : str
+        Directory to save/load model weights and results
+    train_model : bool
+        Whether to train a new model or load an existing one
+    custom_dataset : dict, optional
+        Dictionary containing custom dataset
+    save_dataset : bool, optional
+        Whether to save the dataset to disk
+        
+    Returns
+    -------
+    dict
+        Dictionary containing experiment results
+    """
+    
+    results : dict =  run_training(mode, model_name, model_dir, train_model, custom_dataset, save_dataset)
+    if results is None:
+        return None
+    model = results['model']
+    ds = results['dataset']
+
     # Reload dataset for consistent scaling across experiments
     #ds = deepssfp.Dataset(mode, input_data=data)
-    seg = dataset['seg']    
+    seg = dataset['seg'] 
     if len(seg.shape) == 3:
-        seg = seg[ds.shuffled_indices]
+        #seg = seg[ds.shuffled_indices]
         seg = seg[-ds.x_test.shape[0]:, :]
 
     # Generate predictions
