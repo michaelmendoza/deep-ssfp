@@ -11,6 +11,8 @@ class DataMode(Enum):
     BandRemoval4 = 'BandRemoval:4'
     BandRemoval2 = 'BandRemoval:2'
     SyntheticBanding = 'SyntheticBanding'
+    SyntheticBanding2 = 'SyntheticBanding:2'
+    SyntheticBandingSuperFOVi = 'SyntheticBanding:SuperFOVi' 
     SuperFOV = 'SuperFOV'
     SuperFOVi = 'SuperFOVi'
 
@@ -60,7 +62,7 @@ class Dataset:
         if input_data is not None:
             x = input_data
 
-            if output_data is None and self.mode != 'SyntheticBanding':
+            if output_data is None and 'SyntheticBanding' not in self.mode:
                 y = [] 
                 for slice in range(x.shape[0]):
                     y.append(recon.gs_recon(x[slice,:,:,:], pc_axis=2))
@@ -91,15 +93,17 @@ class Dataset:
             self.outputScaler = self.scaler
         else:
         # Setup data - Use same scaler for SyntheticBanding mode
+            print('Generating scaler... for mode:', self.mode)
             if self.mode == 'SyntheticBanding':
                 print('Using same scaler for SyntheticBanding mode')
                 combined_data = np.concatenate((self.x, self.y), axis=0).astype(self.dtype)
                 self.inputScaler = StandardScaler(combined_data, self.stats_faction)
                 self.outputScaler = StandardScaler(combined_data, self.stats_faction)
+                del combined_data
             else:
                 self.inputScaler = StandardScaler(self.x, self.stats_faction)
                 self.outputScaler = StandardScaler(self.y, self.stats_faction)
-            del combined_data
+            
 
         # Setup data
         self.x = self.inputScaler.transform(self.x).astype(self.dtype)

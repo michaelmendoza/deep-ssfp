@@ -24,6 +24,7 @@ def visualize_images(
         num_samples: int = 1,
         kspace: bool = False, 
         figsize: Optional[Tuple[int, int]] = None,
+        labels: Optional[List[str]] = None,
         save_path: Optional[str] = None):
     
     ''' Visualize input images, Plots input, target and predicted image in a row of images. '''
@@ -90,7 +91,10 @@ def visualize_images(
             for ii in range(Ninput):
                 v = input_images[row,:,:,2*ii] + 1j * input_images[row,:,:,2*ii+1]
                 axs[row, count].imshow(np.abs(v), cmap='gray')
-                axs[row, count].set_title(f'Input {ii+1}')
+                if labels is not None:
+                    axs[row, count].set_title(labels[ii])
+                else:
+                    axs[row, count].set_title(f'Input {ii+1}')
                 axs[row, count].axis('off')
                 count = count + 1
 

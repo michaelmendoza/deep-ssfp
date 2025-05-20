@@ -205,7 +205,7 @@ def read_rawdata(filepath: str, datatype: str = 'image', doChaAverage: bool = Tr
         'isComplex': np.iscomplexobj(data)
     }
 
-def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None, data_format='Complex'):
+def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images', filters = None, data_format='Complex', folder_names = ['pc_0', 'pc_90', 'pc_180', 'pc_270']):
     base_filepath = os.path.normpath(base_filepath)
     save_filepath = os.path.join(base_filepath, cache_filename)
     folders_list = os.listdir(base_filepath) #gives you the list of folders within the Michael_data_for_ML_model folder
@@ -213,15 +213,10 @@ def read_complex_dicom_datasets(base_filepath, cache_filename = 'complex_images'
     if cache_filename in folders_list:
         folders_list.remove(cache_filename)
 
-    sorted_folders = sorted(folders_list, key=lambda x: int(x[2:].split("_")[0])) #sorting the folders based on the number after HV
-    # Note that the folders are now sorted based on the HV - I have not sorted them based on the knee and repetition as that is
-    # not relevant for training or testing and the files will anyway be saved as npy files with the appropriate knee and rep
-    # later
-    
+    sorted_folders = sorted(folders_list)
+
     if filters:
         sorted_folders = list(filter(lambda x: any(f in x for f in filters), sorted_folders))  
-
-    folder_names = ['pc_0', 'pc_90', 'pc_180', 'pc_270']
 
     datasets = []
     for i in range(len(sorted_folders)): #take the 1st 20 sorted folders for the training data
@@ -310,7 +305,7 @@ def load_dicom_dataset(base_filepath, folder_names):
     
     
     # Initialize an empty array for complex images
-    pc_bSSFP_imgs = np.empty((80, 416, 416, 4), dtype=np.complex64)
+    pc_bSSFP_imgs = np.empty((80, 416, 416, len(folder_names)), dtype=np.complex64)
     idx_mg = np.arange(0, 80)  # Magnitude indices
     idx_ph = np.arange(80, 160)  # Phase indices
 

@@ -56,7 +56,7 @@ def run_training(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:
             print(f'Saved dataset found. Loading from file: {ds_path}')
             dataset = np.load(ds_path, allow_pickle=True)[0]
         else:
-            print('Generating new mock phantomdataset...')
+            print('Generating new mock phantom dataset...')
             slices = 200
             tissue_parameters = {
                 0: ('none', 0, 0, 0),
@@ -147,10 +147,11 @@ def run_training(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:
     return {
         'mode': mode,
         'model': model,
-        'dataset': ds
+        'dataset': ds,
+        'rawdata': custom_dataset
     }
 
-def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, save_dataset=True):
+def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, custom_dataset=None, ds = None, save_dataset=True):
     """Run a single experiment with enhanced metrics collection.
     
     Parameters
@@ -174,18 +175,22 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
         Dictionary containing experiment results
     """
     
-    results : dict =  run_training(mode, model_name, model_dir, train_model, custom_dataset, save_dataset)
+    path = os.path.join(model_dir, f"{model_name}_{mode.lower().replace(':', '_')}")
+
+    results : dict =  run_training(mode, model_name, model_dir, train_model, custom_dataset, ds, save_dataset)
     if results is None:
         return None
     model = results['model']
     ds = results['dataset']
+    dataset = results['rawdata']
 
     # Reload dataset for consistent scaling across experiments
     #ds = deepssfp.Dataset(mode, input_data=data)
-    seg = dataset['seg'] 
-    if len(seg.shape) == 3:
-        #seg = seg[ds.shuffled_indices]
-        seg = seg[-ds.x_test.shape[0]:, :]
+    if 'seg' in dataset:
+        seg = dataset['seg'] 
+        if len(seg.shape) == 3:
+            #seg = seg[ds.shuffled_indices]
+            seg = seg[-ds.x_test.shape[0]:, :]
 
     # Generate predictions
     x_test = ds.inputScaler.inverse_transform(ds.x_test)
@@ -217,7 +222,7 @@ def run_experiment(mode='BandRemoval:4', model_name="block_phantom", model_dir="
     print(f"Target shape: {target_complex.shape}, Prediction shape: {pred_complex.shape}")
 
     # Plot a line profile
-    segment_ids = np.unique(dataset['seg'])
+    segment_ids =  np.unique(dataset['seg']) if 'seg' in dataset else 2
 
     plt.figure(figsize=(10, 5))
     line_count = math.floor(math.sqrt(len(segment_ids)))

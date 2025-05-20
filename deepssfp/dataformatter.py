@@ -1,14 +1,15 @@
 import numpy as np
 
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV']
 
 def format_and_prepare_data(x, y, mode):
     ''' Formats and prepares data for deepssfp experiments:
         1) BandRemoval:4 - Transforms complex data into real/img components
         2) BandRemoval:2 - Takes a subset of x data and transforms complex data into real/img components
         3) SyntheticBanding - Takes alternating subsets of data and transforms complex data into real/img components
-        4) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
-        5) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (image-space), output vector also in image-space. 
+        4) SyntheticBanding:2 - Creates input data from 0 and 180 phase cycle, and output from remaining data, and transforms complex data into real/img components
+        5) SyntheticBanding:1 - Creates input data from 0 and 180 phase cycle (using alternating even/odd lines of k-space), and output from remaining data, and transforms complex data into real/img components
+        6) SuperFOV - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (k-space), output vector also in k-space. 
+        7) SuperFOVi - Takes alternating even/odd lines of k-space taken from 2 phase cycled acquisitions (image-space), output vector also in image-space. 
     '''
     if mode == 'BandRemoval:4':
         pass
@@ -17,17 +18,31 @@ def format_and_prepare_data(x, y, mode):
     elif mode == 'SyntheticBanding':
         y = x[:,:,:,1::2]
         x = x[:,:,:,::2]
+    elif mode == 'SyntheticBanding:2':
+        idx = [0, x.shape[3] // 2]
+        _x = x[:,:,:,idx]
+        all_indices = list(range(x.shape[3]))
+        remaining_indices = [i for i in all_indices if i not in idx]
+        y = x[:,:,:,remaining_indices]
+        x = _x
+    elif mode == 'SyntheticBanding:SuperFOVi':
+        idx = [0, x.shape[3] // 2]
+        _x = x[:,:,:,idx]
+        y = x
+        x = _x
     elif mode == 'SuperFOV' or mode == 'SuperFOVi':
         x = x[:,:,:,::2]
-        x = np.fft.fftshift(np.fft.fft2(x, axes=(1,2)), axes=(1,2))
-        y = np.fft.fftshift(np.fft.fft2(y, axes=(1,2)), axes=(1,2))
     else:
         raise Exception('Invalid data mode')
+
+    if mode == 'SuperFOV' or mode == 'SuperFOVi' or mode == 'SyntheticBanding:SuperFOVi':
+        x = np.fft.fftshift(np.fft.fft2(x, axes=(1,2)), axes=(1,2))
+        y = np.fft.fftshift(np.fft.fft2(y, axes=(1,2)), axes=(1,2))
 
     x = complex_to_real_img(x)
     y = complex_to_real_img(y)
 
-    if mode == 'SuperFOV' or mode == 'SuperFOVi':
+    if mode == 'SuperFOV' or mode == 'SuperFOVi' or mode == 'SyntheticBanding:SuperFOVi':
         sx = x.shape
         _x = np.zeros((sx[0], sx[1], sx[2], 2))
         _x[:,::2,:,0] = x[:,::2,:,0]
@@ -36,7 +51,7 @@ def format_and_prepare_data(x, y, mode):
         _x[:,1::2,:,1] = x[:,1::2,:,3]
         x = _x
 
-    if mode == 'SuperFOVi':
+    if mode == 'SuperFOVi' or mode == 'SyntheticBanding:SuperFOVi':
         x = real_imag_to_complex(x)
         y = real_imag_to_complex(y)
         x = np.fft.ifft2(np.fft.fftshift(x, axes=(1,2)), axes=(1,2))
