@@ -18,7 +18,7 @@ class DataMode(Enum):
 
 class Dataset:
 
-    def __init__(self, mode, input_data=None, output_data=None, ratio = 0.8, stats_faction : float = 1.0, scaler = None):
+    def __init__(self, mode, input_data=None, output_data=None, ratio = 0.8, stats_faction : float = 1.0, scaler = None, verbose=True):
         """Initialize Dataset with either provided data or loaded data.
             
             Parameters
@@ -44,8 +44,8 @@ class Dataset:
         self.stats_faction = stats_faction
         self.dtype = self.x.dtype
 
-        print(f"Dataset: mode:{self.mode}, size:{self.SIZE} height:{self.HEIGHT} width:{self.WIDTH} cin:{self.CHANNELS_IN} cout:{self.CHANNELS_OUT} ratio:{self.ratio}")
-        print(f"dtype: {self.x.dtype}, {self.y.dtype}")
+        if verbose:
+            print(f"Dataset: mode:{self.mode}, size:{self.SIZE} height:{self.HEIGHT} width:{self.WIDTH} cin:{self.CHANNELS_IN} cout:{self.CHANNELS_OUT} ratio:{self.ratio} dtype: {self.x.dtype}, {self.y.dtype}")
 
         self.generate()
 
@@ -76,10 +76,10 @@ class Dataset:
 
         if input_data is None or output_data is None:
             # Format data
-            print('Formatting data...')
+            #print('Formatting data...')
             x, y = dataformatter.format_and_prepare_data(x, y, self.mode)
         else:
-            print('Info: Data all ready formated.')
+            #print('Info: Data all ready formated.')
             x, y = (input_data, output_data)
 
         return x, y
@@ -88,14 +88,14 @@ class Dataset:
         ''' Generates training/test dataset '''
         
         if self.scaler is not None:
-            print("Using provided scaler")
+            #print("Using provided scaler")
             self.inputScaler = self.scaler
             self.outputScaler = self.scaler
         else:
         # Setup data - Use same scaler for SyntheticBanding mode
-            print('Generating scaler... for mode:', self.mode)
+            #print('Generating scaler... for mode:', self.mode)
             if self.mode == 'SyntheticBanding':
-                print('Using same scaler for SyntheticBanding mode')
+                #print('Using same scaler for SyntheticBanding mode')
                 combined_data = np.concatenate((self.x, self.y), axis=0).astype(self.dtype)
                 self.inputScaler = StandardScaler(combined_data, self.stats_faction)
                 self.outputScaler = StandardScaler(combined_data, self.stats_faction)

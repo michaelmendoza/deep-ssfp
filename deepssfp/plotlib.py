@@ -64,7 +64,7 @@ def visualize_images(
         figsize = (num_cols * 2, num_samples * 2)
     else:
         figsize = (num_cols * figsize[0], num_samples * figsize[1])
-    print(f"Figure size: {figsize}")
+    #print(f"Figure size: {figsize}")
 
     # Convert to k-space (using ifft)
     if(kspace):
