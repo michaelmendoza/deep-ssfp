@@ -11,8 +11,11 @@ from typing import Dict, List, Optional, Union, Tuple
 import mssfp
 import deepssfp
 import deepssfp.recon
+from skimage.metrics import structural_similarity as ssim
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import normalized_root_mse as nrmse
 
-def create_brain_dataset(save_path = None):
+def create_brain_rawdata(save_path = None):
     if save_path and os.path.isfile(save_path):
         print(f'Saved dataset found. Loading from file: {save_path}')
         dataset = np.load(save_path, allow_pickle=True)[0]
@@ -21,7 +24,11 @@ def create_brain_dataset(save_path = None):
     dataset = mssfp.generate_ssfp_dataset(
         phantom_type='brain', 
         npcs=4, 
+        TR = 3e-3, 
+        TE = 3e-3 / 2, 
         f=500, 
+        df = 0.75 * 1/3e-3,
+        df_window = 1,
         alpha=np.deg2rad(60), 
         sigma=0.001, 
         data_indices=[(0, 2), (120,180)], 
@@ -35,7 +42,7 @@ def create_brain_dataset(save_path = None):
         np.save(save_path, [dataset])
     return dataset
 
-def create_block_dataset(save_path = None):
+def create_block_rawdata(save_path = None):
     if save_path and os.path.isfile(save_path):
         print(f'Saved dataset found. Loading from file: {save_path}')
         dataset = np.load(save_path, allow_pickle=True)[0]
@@ -75,14 +82,12 @@ def create_block_dataset(save_path = None):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         np.save(save_path, [dataset])
     return dataset
-
+    
 def generate_paths(mode, model_name, model_dir):
     """Generate paths for a model and dataset."""
     # Create paths
     path = os.path.join(model_dir, f"{model_name}_{mode.lower().replace(':', '_')}")
-    ds_path = os.path.join(model_dir, f"{model_name}_dataset.npy")
-
-    return path, ds_path
+    return path
 
 def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, verbose=True) -> dict:
     """ Train a deepssfp model on a dataset.
@@ -107,12 +112,11 @@ def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", mode
     """
     
     # Create paths
-    path, ds_path = generate_paths(mode, model_name, model_dir)
+    path = generate_paths(mode, model_name, model_dir)
 
     if verbose:
         print(f"\n===== Training: {mode} =====")
         print(f"Model path: {path}")
-        print(f"Dataset path: {ds_path}")
 
         # Train or load model
     if train_model:
@@ -153,6 +157,92 @@ def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", mode
     return {
         'mode': mode,
         'model': model,
-        'history': history_dict 
+        'history': history_dict, 
+        'path': path
     }
 
+def run_inference_on_test_dataset(dataset, model, verbose=False):
+    mode = dataset.mode
+
+    # Generate predictions
+    x_test = dataset.inputScaler.inverse_transform(dataset.x_test)
+    y_test = dataset.outputScaler.inverse_transform(dataset.y_test)
+    predictions = dataset.outputScaler.inverse_transform(deepssfp.predict(model, dataset.x_test))
+
+    if verbose:
+        deepssfp.visualize_images(
+            input_images=x_test,
+            target_images=y_test,
+            predicted_images=predictions,
+            num_samples=2,
+            kspace= True if mode == deepssfp.DataMode.SuperFOV.value else False
+        )
+
+    # Format data from real/imag pairs to complex
+    if (mode == deepssfp.DataMode.SyntheticBanding.value):
+        target = deepssfp.combine_synthetic_banding_datasets(x_test, y_test)
+        target_complex = deepssfp.recon.gs_recon_3d(target)
+        combine = deepssfp.combine_synthetic_banding_datasets(x_test, predictions)
+        pred_complex = deepssfp.recon.gs_recon_3d(combine)
+    else:
+        pred_complex = deepssfp.from_pairs_to_complex(predictions)
+        target_complex = deepssfp.from_pairs_to_complex(y_test)
+    if (mode == deepssfp.DataMode.SuperFOV.value):
+         pred_complex = deepssfp.ifft(pred_complex)
+         target_complex = deepssfp.ifft(target_complex)
+
+    return pred_complex, target_complex
+
+def create_segmentation_mask(M):
+    # Create mask of phantom
+    _ = np.sqrt(np.sum(np.abs(M)**2, axis=3))
+    _ = abs(_)
+    from skimage.filters import threshold_li
+    thresh = threshold_li(_)
+    mask = np.abs(_) > thresh
+    seg = mask * 1
+    return seg
+
+def compute_image_metrics(pred, target, verbose=False):
+
+    metrics = {
+        'mse': { 'values': [], 'mean': 0, 'std': 0 },
+        'mae': { 'values': [], 'mean': 0, 'std': 0 },
+        'psnr': { 'values': [], 'mean': 0, 'std': 0 },
+        'ssim': { 'values': [], 'mean': 0, 'std': 0 },
+        'nrmse': { 'values': [], 'mean': 0, 'std': 0 },
+    }
+
+    for i in range(target.shape[0]):
+        _pred = np.abs(pred[i])
+        _target = np.abs(target[i])
+        data_range = np.max(_target) - np.min(_target)
+
+        mse_val = np.mean((_target - _pred) ** 2)
+        mae_val = np.mean(np.abs(_target - _pred))
+        psnr_val = psnr(_target, _pred, data_range=data_range)
+        ssim_val = ssim(_target, _pred, data_range=data_range, gaussian_weights=True)
+        nrmse_val = nrmse(_target, _pred)
+
+        # Add to metrics
+        metrics['mse']['values'].append(mse_val)
+        metrics['mae']['values'].append(mae_val)
+        metrics['psnr']['values'].append(psnr_val)
+        metrics['ssim']['values'].append(ssim_val)
+        metrics['nrmse']['values'].append(nrmse_val)
+
+    # Calculate mean and std
+    status = ''
+    for metric in metrics:
+        metrics[metric]['mean'] = np.mean(metrics[metric]['values'])
+        metrics[metric]['std'] = np.std(metrics[metric]['values'])
+        #status += f"{metric}: {metrics[metric]['mean']:.2e} +/- {metrics[metric]['std']:.2e} "
+    
+        mean_str = f"{metrics[metric]['mean']:.4f}" if 1 <= abs(metrics[metric]['mean']) < 10000 else f"{metrics[metric]['mean']:.2e}"
+        std_str = f"{metrics[metric]['std']:.4f}" if 1 <= abs(metrics[metric]['std']) < 10000 else f"{metrics[metric]['std']:.2e}"   
+        status += f"{metric}: {mean_str} +/- {std_str} "
+
+    if verbose:
+        print(status)
+
+    return metrics
