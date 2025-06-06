@@ -29,9 +29,11 @@ def create_brain_rawdata(save_path = None):
         f=500, 
         df = 0.75 * 1/3e-3,
         df_window = 1,
-        alpha=np.deg2rad(60), 
+        fn_perlin=100, 
+        fn_perlin_size=3,
+        alpha=np.deg2rad(22), 
         sigma=0.001, 
-        data_indices=[(0, 2), (120,180)], 
+        data_indices=[(0, 8), (120,180)], 
         rotation=90,
         useRotate=True, 
         useDeform=True
@@ -48,7 +50,7 @@ def create_block_rawdata(save_path = None):
         dataset = np.load(save_path, allow_pickle=True)[0]
         return dataset
 
-    slices = 500
+    slices = 480
     tissue_parameters = {
         0: ('none', 0, 0, 0),
         1: ('fat', 0.350, 0.130, 0),
@@ -65,12 +67,15 @@ def create_block_rawdata(save_path = None):
     dataset = mssfp.generate_ssfp_dataset(
         phantom_type='block', 
         slices=slices, 
-        shape=128, 
+        shape=256, 
         ids=[1, 2, 3, 4, 5, 6, 7, 8, 9],
         tissues = tissue_parameters,
         npcs=4, 
         f=500, 
-        alpha=np.deg2rad(40), 
+        df_window = 1,
+        fn_perlin=100, 
+        fn_perlin_size=3,
+        alpha=np.deg2rad(22), 
         sigma=0.001, 
         useRotate=True, 
         useDeform=True,
@@ -89,7 +94,9 @@ def generate_paths(mode, model_name, model_dir):
     path = os.path.join(model_dir, f"{model_name}_{mode.lower().replace(':', '_')}")
     return path
 
-def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", train_model=True, verbose=True) -> dict:
+def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", model_dir="D:/DeepSSFP/", 
+                 fine_tune=False, fine_tune_model_path="", fine_tune_suffix="finetuned", fine_tune_lr=1e-5,
+                 train_model=True, epochs=400, verbose=True) -> dict:
     """ Train a deepssfp model on a dataset.
     
     Parameters
@@ -118,20 +125,39 @@ def run_training(dataset, mode='BandRemoval:4', model_name="block_phantom", mode
         print(f"\n===== Training: {mode} =====")
         print(f"Model path: {path}")
 
-        # Train or load model
+    # Train or load model
     if train_model:
         if verbose:
             print("\nTraining model...")
-        model, history_dict, ds, predictions = deepssfp.train(
-            mode=mode,
-            model_name=model_name,
-            model_dir=model_dir,
-            custom_dataset=dataset,
-            epochs=800,
-            use_early_stopping=True,
-            patience=200,
-            continue_training=True
-        )
+
+        if fine_tune:
+            if verbose:
+                print("\nFine-tuning model...")
+            model, history_dict, ds, predictions = deepssfp.train(
+                mode=mode,
+                model_name=model_name,
+                model_dir=model_dir,
+                custom_dataset=dataset,
+                epochs=epochs,
+                use_early_stopping=True,
+                patience=200,
+                continue_training=True,
+                fine_tune=True,
+                fine_tune_model_path=fine_tune_model_path,
+                fine_tune_suffix=fine_tune_suffix,
+                fine_tune_lr=fine_tune_lr
+            )
+        else:
+            model, history_dict, ds, predictions = deepssfp.train(
+                mode=mode,
+                model_name=model_name,
+                model_dir=model_dir,
+                custom_dataset=dataset,
+                epochs=epochs,
+                use_early_stopping=True,
+                patience=200,
+                continue_training=True
+            )
     else:
         if verbose:
             print("\nLoading pre-trained model...")
