@@ -3,6 +3,9 @@
 __pycache__/
 .ipynb_checkpoints/
 
+# Mac-related files
+.DS_Store
+
 # Data files
 *.npy
 *.mp4
