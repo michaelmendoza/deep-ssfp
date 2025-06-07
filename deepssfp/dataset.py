@@ -5,7 +5,7 @@ from enum import Enum
 from deepssfp import dataloader, dataformatter, recon
 
 # 'SyntheticBanding:1_3->2_4': 'SyntheticBanding'
-modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV']
+modes = ['BandRemoval:4', 'BandRemoval:2', 'SyntheticBanding', 'SuperFOV', 'SuperFOVi']
 
 class DataMode(Enum):
     BandRemoval4 = 'BandRemoval:4'
