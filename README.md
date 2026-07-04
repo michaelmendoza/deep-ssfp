@@ -28,7 +28,7 @@ To setup a python enviroment with conda:
 > ```
 > Then install packages with pip:
 > ```
-> pip install numpy matplotlib scipy scikit-image seabornpy mapvbvd tensorflow jupyterlab 
+> pip install numpy matplotlib scipy scikit-image mapvbvd tensorflow jupyterlab pydicom
 > ```
 
 - Run to API server

@@ -54,7 +54,7 @@ class HistorySaver(Callback):
             if key in logs:
                 self.history_dict[key].append(logs[key])
         
-        lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        lr = float(tf.keras.backend.get_value(self.model.optimizer.learning_rate))
         self.history_dict['lr'].append(lr)
         print(f"Learning rate: {lr:.4f}")
         
